@@ -172,6 +172,83 @@ pause
     })
 }
 
+fn silent_command(program: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    cmd
+}
+
+#[tauri::command]
+fn ollama_models() -> Result<Vec<String>, String> {
+    if let Ok(resp) = ureq::get("http://localhost:11434/api/tags").call() {
+        if let Ok(body_str) = resp.into_string() {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
+                if let Some(models) = json["models"].as_array() {
+                    let mut list = Vec::new();
+                    for m in models {
+                        if let Some(name) = m["name"].as_str() {
+                            list.push(name.to_string());
+                        }
+                    }
+                    if !list.is_empty() {
+                        return Ok(list);
+                    }
+                }
+            }
+        }
+    }
+
+    let out = silent_command("ollama")
+        .args(["list"])
+        .output()
+        .map_err(|e| format!("Ollama API接続できず、CLI起動エラー: {}", e))?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).to_string());
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut models = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        if i == 0 { continue; }
+        if let Some(name) = line.split_whitespace().next() {
+            if !name.is_empty() {
+                models.push(name.to_string());
+            }
+        }
+    }
+    Ok(models)
+}
+
+#[tauri::command]
+fn ollama_generate(model: String, prompt: String, system: String) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "model": model,
+        "prompt": prompt,
+        "system": system,
+        "stream": false,
+        "format": "json",
+        "options": { "temperature": 0.3 }
+    });
+
+    let resp = ureq::post("http://localhost:11434/api/generate")
+        .set("Content-Type", "application/json")
+        .send_string(&payload.to_string())
+        .map_err(|e| format!("Ollama HTTP Error: {}", e))?;
+
+    let body_str = resp.into_string().map_err(|e| e.to_string())?;
+    let json: serde_json::Value = serde_json::from_str(&body_str)
+        .map_err(|e| format!("JSON Parse Error: {}", e))?;
+
+    let content = json["response"].as_str().unwrap_or("").to_string();
+    if content.is_empty() {
+        return Err("Ollama から空の応答が返されました。モデルがJSON出力に対応しているかご確認下さい。".to_string());
+    }
+    Ok(content)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -184,7 +261,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_app_data,
             save_app_data,
-            export_lora_dataset
+            export_lora_dataset,
+            ollama_models,
+            ollama_generate
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

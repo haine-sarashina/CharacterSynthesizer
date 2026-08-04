@@ -305,31 +305,17 @@ Example JSON output:
     
     try {
         const ollamaModel = document.getElementById('ollama-model').value;
-        const response = await fetch('http://localhost:11434/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: ollamaModel,
-                prompt: magicInput,
-                system: systemPrompt,
-                stream: false,
-                format: 'json',
-                options: { temperature: 0.3 } // Lower temperature for more stable JSON
-            })
+        const respText = await invoke("ollama_generate", {
+            model: ollamaModel,
+            prompt: magicInput,
+            system: systemPrompt
         });
+        console.log("Ollama raw response via Rust IPC:", respText);
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log("Ollama raw response:", data.response);
-        
-        if (!data.response || data.response.trim() === "") {
+        if (!respText || respText.trim() === "") {
             throw new Error("Ollama returned an empty response. The model might not support the current prompt or options.");
         }
-        
-        let rawStr = data.response.trim();
+        let rawStr = respText.trim();
         // Remove standard <think> blocks
         rawStr = rawStr.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
         
@@ -1531,20 +1517,17 @@ function renderLibrary() {
 
 async function loadOllamaModels() {
     try {
-        const response = await fetch('http://localhost:11434/api/tags');
-        if (!response.ok) throw new Error("Could not fetch from Ollama API");
-        const data = await response.json();
-        if (data.models && Array.isArray(data.models)) {
+        const models = await invoke("ollama_models");
+        if (models && Array.isArray(models)) {
             const select = document.getElementById("ollama-model");
             const currentVal = select.value;
             select.innerHTML = "";
-            data.models.forEach(model => {
+            models.forEach(modelName => {
                 const opt = document.createElement("option");
-                opt.value = model.name;
-                opt.innerText = model.name;
+                opt.value = modelName;
+                opt.innerText = modelName;
                 select.appendChild(opt);
             });
-            // Try to restore previous selection
             const hasOption = Array.from(select.options).some(opt => opt.value === currentVal);
             if (hasOption) {
                 select.value = currentVal;
@@ -1553,7 +1536,7 @@ async function loadOllamaModels() {
             }
         }
     } catch (e) {
-        console.error("Failed to load Ollama models", e);
+        console.error("Failed to load Ollama models via Rust IPC:", e);
     }
 }
 
