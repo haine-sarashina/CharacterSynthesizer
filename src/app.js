@@ -1569,6 +1569,28 @@ async function init() {
     await loadSettings();
     await loadCustomPresets();
     renderLibrary();
+
+    // 起動時の自動アップデート監視
+    setTimeout(async () => {
+        try {
+            const { check } = await import('@tauri-apps/plugin-updater');
+            const update = await check();
+            if (update) {
+                const { ask } = await import('@tauri-apps/plugin-dialog');
+                const yes = await ask(`最新のアプリケーショングレード (${update.version}) がリリースされています。\n自動でダウンロードとインストールを適用し、再起動しますか？`, {
+                    title: "CHARACTER_SYNTHESIZER 更新通知",
+                    kind: "info",
+                });
+                if (yes) {
+                    await update.downloadAndInstall();
+                    const { relaunch } = await import('@tauri-apps/plugin-process');
+                    await relaunch();
+                }
+            }
+        } catch (e) {
+            console.log("自動アプデ監視スキップ（開発モード等）:", e);
+        }
+    }, 4000);
 }
 init();
 
@@ -1931,6 +1953,43 @@ async function exportLoraDataset() {
     }
 }
 
+async function checkUpdateManually() {
+    const btn = document.getElementById("btn-check-update");
+    try {
+        if (btn) btn.innerHTML = "🔄 確認中...";
+        const { check } = await import('@tauri-apps/plugin-updater');
+        const update = await check();
+        if (update) {
+            const { ask } = await import('@tauri-apps/plugin-dialog');
+            const yes = await ask(`新バージョン (${update.version}) が見つかりました。\nダウンロード＆インストールを開始してアプリを再起動しますか？`, {
+                title: "アップデート確認通知",
+                kind: "info",
+            });
+            if (yes) {
+                if (btn) btn.innerHTML = "⬇️ 更新中...";
+                await update.downloadAndInstall();
+                const { relaunch } = await import('@tauri-apps/plugin-process');
+                await relaunch();
+            } else {
+                if (btn) btn.innerHTML = "🔄 アップデート確認";
+            }
+        } else {
+            const { message } = await import('@tauri-apps/plugin-dialog');
+            await message("現在のバージョン (v0.3.0) は最新の状態です。", { title: "更新確認結果", kind: "info" });
+            if (btn) btn.innerHTML = "🔄 アップデート確認";
+        }
+    } catch (e) {
+        console.error("手動アプデ確認スキップ・エラー:", e);
+        try {
+            const { message } = await import('@tauri-apps/plugin-dialog');
+            await message("更新確認がスキップされました。（現在、オフライン・ローカル開発モードか未リリースの状態です）\n詳細: " + e, { title: "確認完了", kind: "warning" });
+        } catch (dialogErr) {
+            alert("更新確認スキップ (開発モード): " + e);
+        }
+        if (btn) btn.innerHTML = "🔄 アップデート確認";
+    }
+}
+
 // Expose functions to window for HTML inline event handlers in ES Module mode
 window.switchStudioTab = switchStudioTab;
 window.generateAnimaPrompt = generateAnimaPrompt;
@@ -1940,3 +1999,4 @@ window.exportLoraDataset = exportLoraDataset;
 window.clearLoraCart = clearLoraCart;
 window.exportPresetsToFile = exportPresetsToFile;
 window.importPresetsFromFile = importPresetsFromFile;
+window.checkUpdateManually = checkUpdateManually;

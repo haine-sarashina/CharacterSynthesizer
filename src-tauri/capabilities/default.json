@@ -30,6 +30,8 @@
     "dialog:default",
     "fs:default",
     "process:default",
-    "shell:default"
+    "process:allow-restart",
+    "shell:default",
+    "updater:default"
   ]
 }
