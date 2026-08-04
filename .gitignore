@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+pnpm-debug.log*
+
+# Build output
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/WixTools/
+
+# Runtime user data and exported datasets
+data/*.json
+datasets/
+
+# IDE
+.vscode/
+.idea/
+
+# AI & tooling
+.claude/
+.gemini/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*

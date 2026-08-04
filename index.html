@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Character Synthesizer - AI Character Creator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <!-- ヘッダー -->
+        <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h1 class="logo-text">CHARACTER_SYNTHESIZER</h1>
+                <span class="version-badge">v0.3.0</span>
+            </div>
+            <div class="studio-tab-bar" style="display: flex; gap: 10px;">
+                <button id="tab-btn-gacha" class="studio-tab-btn active" onclick="switchStudioTab('gacha')">🎰 ガチャ＆合成スタジオ</button>
+                <button id="tab-btn-lora" class="studio-tab-btn" onclick="switchStudioTab('lora')">🧪 LoRA学習スタジオ <span id="lora-cart-badge" class="cart-badge">0</span></button>
+            </div>
+        </header>
+
+        <!-- メイングリッド (Gacha & Synthesis) -->
+        <main id="view-gacha" class="main-content">
+            <!-- 左側：コントロールパネル -->
+            <section class="control-panel panel">
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>GACHA_ROLL_SETTINGS</h2>
+                    <button id="btn-open-settings" class="tag-action-btn" title="Open Settings" style="font-size: 1.2em; padding: 4px 8px;">⚙️</button>
+                </div>
+                <div class="panel-body">
+
+                    <!-- プロンプト生成フロー -->
+                    <div class="form-group" style="border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; background: rgba(0,0,0,0.2);">
+                        <label for="magic-prompt" style="color: var(--accent-color);">1. 描きたい情景を入力 (日本語)</label>
+                        <textarea id="magic-prompt" placeholder="(例: 夜のサイバーパンクシティに立つ青い髪の少女。ネオンの光が反射している。高画質。)" rows="2" style="width: 100%; margin-bottom: 5px;"></textarea>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                            <button id="btn-magic-prompt" class="btn secondary-btn" onclick="generateAnimaPrompt()" style="width: 100%; padding: 12px; font-size: 1.1em;">
+                                <span class="icon">🪄</span> Generate Magic Prompt
+                            </button>
+                        </div>
+                        
+                    </div>
+
+
+
+                    <!-- 画像サイズ設定 -->
+                    <div class="form-group row">
+                        <div>
+                            <label for="image-width">Width</label>
+                            <select id="image-width">
+                                <option value="512" selected>512</option>
+                                <option value="768">768</option>
+                                <option value="1024">1024</option>
+                                <option value="1280">1280</option>
+                                <option value="1536">1536</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="image-height">Height</label>
+                            <select id="image-height">
+                                <option value="512">512</option>
+                                <option value="768" selected>768</option>
+                                <option value="1024">1024</option>
+                                <option value="1280">1280</option>
+                                <option value="1536">1536</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="batch-size">Batch Size</label>
+                        <input type="number" id="batch-size" min="1" max="30" value="4" style="width: 100%;">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 中央：ビューポート（ガチャ結果＆合成プレビュー） -->
+            <section class="viewport-area">
+                <!-- タスク進行インジケーター -->
+                <div id="progress-container" class="progress-container hidden">
+                    <div class="progress-info">
+                        <span id="progress-status">Generating...</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                    <div class="progress-bar-wrapper">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
+
+                <div class="viewport-grid" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                    
+                    <!-- Moved Prompt Output Area -->
+                    <div class="panel" style="margin-bottom: 16px;">
+                        <div class="panel-header">
+                            <h2>Magic Prompt Output</h2>
+                        </div>
+                        <div class="panel-body" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+                            <label style="color: var(--accent-color); display: flex; justify-content: space-between; align-items: center;">
+                                <span>2. プロンプトの確認・成形 (AI生成 / マクロ展開)</span>
+                            </label>
+                            <div style="display: flex; gap: 10px; position: relative;">
+                                <!-- Tags Column (幅狭め) -->
+                                <div style="flex: 1.2; display: flex; flex-direction: column; position: relative;">
+                                    <label style="font-size: 0.85em; opacity: 0.8; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        Tags & Weights
+                                        <span>
+                                            <button id="add-tag-btn" class="tag-action-btn" style="margin-right: 2px;">+ Add</button>
+                                            <button id="paste-tags-btn" class="tag-action-btn" style="margin-right: 2px;">Paste</button>
+                                            <button id="copy-tags-btn" class="tag-action-btn">Copy</button>
+                                        </span>
+                                    </label>
+                                    <div id="tags-editor-container" style="width: 100%; height: 350px; overflow-y: auto; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 5px; flex-shrink: 0;">
+                                        <div id="tags-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                                    </div>
+                                    <div id="autocomplete-suggestions" class="autocomplete-suggestions hidden"></div>
+                                    <div id="tags-warnings" style="color: #ff5555; font-size: 0.85em; margin-top: 4px;"></div>
+                                </div>
+                                
+                                <!-- Text Column (幅普通) -->
+                                <div style="flex: 2; display: flex; flex-direction: column;">
+                                    <label for="text-confirm" style="font-size: 0.85em; opacity: 0.8;">Text (1文ごとに改行)</label>
+                                    <textarea id="text-confirm" placeholder="A young woman with flowing red hair...&#10;She is standing in a vibrant futuristic city at night..." style="width: 100%; height: 350px; resize: vertical; font-family: monospace;"></textarea>
+                                </div>
+                                
+                                <!-- Middle Formatting Column -->
+                                <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 5px;">
+                                    <button id="btn-format-prompt" class="btn btn-secondary" onclick="formatFinalPrompt()" style="background: rgba(0, 255, 136, 0.2); border-color: rgba(0, 255, 136, 0.4); padding: 10px 5px; height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                                        <span style="writing-mode: vertical-rl; text-orientation: upright; font-weight: bold; letter-spacing: 5px;">成形</span>
+                                        <span style="font-size: 1.5em; margin-top: 10px;">➡️</span>
+                                    </button>
+                                </div>
+
+                                <!-- Final Prompt & Roll Column (幅広め) -->
+                                <div style="flex: 2.5; display: flex; flex-direction: column;">
+                                    <label for="prompt-input" style="font-size: 0.85em; opacity: 0.8; color: var(--accent-color);">3. 最終プロンプト (クリックでコピー)</label>
+                                    <textarea id="prompt-input" placeholder="ここに成形されたプロンプトが出力されます。" readonly style="background: rgba(0,0,0,0.5); cursor: copy; flex: 1; height: 280px; resize: vertical; margin-bottom: 10px;" onclick="this.select(); document.execCommand('copy'); alert('Copied to clipboard!');"></textarea>
+                                    
+                                    <button id="generate-btn" class="btn primary-btn" disabled style="height: 60px; font-size: 1.2em;">
+                                        <span class="btn-text">Gacha Roll</span>
+                                        <span class="btn-glow"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gacha Output Area -->
+                <div class="panel viewport-area" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                    <div class="panel-header">
+                        <h2>Gacha Candidates (Batch)</h2>
+                    </div>
+                    <div class="panel-body" style="padding: 16px; display: flex; flex-direction: row; align-items: center; flex: 1; min-height: 0; min-width: 0; width: 100%; box-sizing: border-box; overflow: hidden;">
+                        <button id="scroll-left-btn" class="carousel-btn">&lt;</button>
+                        <div class="carousel-container" style="flex: 1; height: 100%; overflow: hidden; position: relative; margin: 0 16px; min-width: 0;">
+                            <div id="candidates-grid" class="candidates-grid">
+                                <div class="candidate-placeholder">Generated candidates will appear here.</div>
+                            </div>
+                        </div>
+                        <button id="scroll-right-btn" class="carousel-btn">&gt;</button>
+                    </div>
+                </div>
+
+                    <!-- 下段：モンタージュプレビュー (Hidden for Gacha focus) -->
+                    <div class="panel" style="display: none; flex: 1; flex-direction: column; min-height: 0;">
+                        <div class="panel-header">
+                            <h2>MONTAGE CANVAS</h2>
+                        </div>
+                        <div class="panel-body" style="flex-direction: row; align-items: center; justify-content: space-around;">
+                            <!-- ベース画像 -->
+                            <div class="preview-box">
+                                <h4>Base Image</h4>
+                                <div class="preview-wrapper">
+                                    <div id="base-placeholder" class="image-placeholder">Select a Base</div>
+                                    <img id="base-preview-img" class="preview-img hidden" alt="Base">
+                                </div>
+                            </div>
+                            <!-- Part Image -->
+                            <div class="preview-box">
+                                <h4>Part Image (Source)</h4>
+                                <div class="preview-wrapper">
+                                    <div class="image-placeholder" id="part-placeholder">Select from candidates...</div>
+                                    <img id="part-preview-img" class="preview-img hidden" src="" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Row: Controls & Result -->
+                        <div style="display: flex; gap: 16px; height: 100%;">
+                            
+                            <!-- Synthesis Controls -->
+                            <div style="flex: 1; display: flex; flex-direction: column; gap: 16px; justify-content: center; background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px;">
+                                <h3 style="color: var(--accent-blue); text-align: center; margin-bottom: 8px;">AI_MONTAGE_SETTINGS</h3>
+                                <div class="form-group">
+                                    <label for="clipseg-prompt">CLIPSeg Target (e.g., "face", "hair")</label>
+                                    <input type="text" id="clipseg-prompt" placeholder="What to cut from the Part Image..." />
+                                </div>
+                                <div class="form-group">
+                                    <label for="denoise-slider">Inpaint Denoise Strength: <span id="denoise-val">0.45</span></label>
+                                    <input type="range" id="denoise-slider" min="0.1" max="1.0" step="0.05" value="0.45">
+                                </div>
+                                <button id="synthesize-btn" class="btn primary-btn" disabled style="margin-top: auto; font-size: 1.1rem; padding: 16px;">Synthesize (Inpaint)</button>
+                            </div>
+
+                            <!-- Result Preview -->
+                            <div class="preview-box" style="flex: 1;">
+                                <h4>Synthesized Result</h4>
+                                <div class="preview-wrapper" style="border-color: var(--accent-blue);">
+                                    <div class="image-placeholder" id="result-placeholder">Awaiting synthesis...</div>
+                                    <img id="result-img" class="preview-img hidden" src="" />
+                                </div>
+                                <div style="display: flex; width: 100%; gap: 8px; margin-top: 8px;">
+                                    <button id="save-base-btn" class="btn secondary-btn" disabled style="flex: 1; padding: 8px; font-size: 0.85rem;">Use as New Base</button>
+                                </div>
+                                <!-- Save to Library Form -->
+                                <div id="save-library-form" class="form-group" style="width: 100%; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; padding: 8px; background: rgba(0,0,0,0.4); border-radius: 4px; border: 1px solid var(--border-color);">
+                                    <div style="display: flex; gap: 4px;">
+                                        <input type="text" id="asset-name" placeholder="Asset Name (e.g. Bob-Base)" style="flex: 2; padding: 4px; font-size: 0.85rem;" />
+                                        <select id="asset-category" style="flex: 1; padding: 4px; font-size: 0.85rem;">
+                                            <option value="base">Base</option>
+                                            <option value="clothing">Clothing</option>
+                                            <option value="background">Background</option>
+                                        </select>
+                                    </div>
+                                    <button id="save-library-btn" class="btn secondary-btn" disabled style="width: 100%; padding: 6px; font-size: 0.85rem; border-color: var(--accent-purple); color: var(--accent-purple);">Save to Library</button>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- LoRA学習スタジオ View (Phase 2) -->
+            <main id="view-lora" class="main-content hidden">
+                <!-- 左側：データセット設定＆エクスポートパネル -->
+                <section class="control-panel panel">
+                    <div class="panel-header">
+                        <h2>LORA_TRAINING_STUDIO</h2>
+                    </div>
+                    <div class="panel-body" style="display: flex; flex-direction: column; gap: 15px;">
+                        <div class="form-group" style="border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; background: rgba(0,0,0,0.2);">
+                            <label style="color: var(--accent-color); font-weight: bold; margin-bottom: 8px;">1. ターゲット LoRA 設定</label>
+                            
+                            <div class="form-group">
+                                <label for="lora-dataset-name">LoRA モデル名 (英数字)</label>
+                                <input type="text" id="lora-dataset-name" value="my_character_v1" placeholder="例: bobuko_v1" style="width: 100%;" />
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="lora-trigger-word">トリガーワード (呼び出し主タグ)</label>
+                                <div style="display: flex; gap: 6px;">
+                                    <input type="text" id="lora-trigger-word" value="bobuko_chr" placeholder="例: bobuko_chr" style="flex: 1;" />
+                                    <button id="btn-apply-trigger" class="btn secondary-btn" onclick="applyTriggerWordToAll()" style="padding: 6px 10px; font-size: 0.8em;" title="ストック全キャプションの先頭に付与">🏷️ 全文頭に追加</button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group row">
+                                <div>
+                                    <label for="lora-repeats">繰り返し回数 (Repeats)</label>
+                                    <input type="number" id="lora-repeats" value="20" min="1" max="100" />
+                                </div>
+                                <div>
+                                    <label for="lora-reso">学習解像度 (Resolution)</label>
+                                    <select id="lora-reso">
+                                        <option value="512">512px</option>
+                                        <option value="768">768px</option>
+                                        <option value="1024" selected>1024px (SDXL推奨)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="border: 1px solid var(--accent-blue); padding: 15px; border-radius: 8px; background: rgba(0, 195, 255, 0.05);">
+                            <label style="color: var(--accent-blue); font-weight: bold; margin-bottom: 8px;">2. 学習エンジン対応＆出力</label>
+                            <p style="font-size: 0.85em; opacity: 0.85; line-height: 1.5; margin-bottom: 15px;">
+                                世界標準の <strong>Kohya SS / sd-scripts / OneTrainer</strong> のいずれでも即座に学習開始できる正規化データセット（画像＋txt）と準備バッチを PC の <code>datasets/</code> フォルダへ全自動で作成・出力します！
+                            </p>
+                            
+                            <button id="btn-export-dataset" class="btn primary-btn" onclick="exportLoraDataset()" style="width: 100%; padding: 14px; font-size: 1.1em; background: linear-gradient(135deg, #00c3ff, #7928ca); border: none; font-weight: bold; cursor: pointer;">
+                                <span class="icon">🚀</span> データセット出力 ＆ 学習準備
+                            </button>
+                            <div id="export-status-msg" style="margin-top: 10px; font-size: 0.85em; text-align: center; color: #00ff88;"></div>
+                        </div>
+                        
+                        <div style="margin-top: auto;">
+                            <button id="btn-clear-cart" class="tag-action-btn" onclick="clearLoraCart()" style="width: 100%; padding: 8px; border-color: rgba(255, 68, 68, 0.5); color: #ff6464;">🗑️ ストック一覧を空にする</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 右側：学習ストックトレイ＆キャプションエディター -->
+                <section class="preview-panel panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>DATASET_STOCK_TRAY (<span id="tray-count">0</span> pairs)</h2>
+                        <span style="font-size: 0.85em; opacity: 0.7;">画像の右隣でキャプションの微調整が可能です</span>
+                    </div>
+                    <div class="panel-body" style="overflow-y: auto; max-height: 80vh;">
+                        <div id="lora-stock-grid" style="display: flex; flex-direction: column; gap: 12px; padding: 10px;">
+                            <div class="empty-tray-notice" style="text-align: center; padding: 60px; color: rgba(255,255,255,0.3); font-size: 1.1em;">
+                                ガチャ生成後の結果画像から「⭐ Stock for LoRA」をポンッとクリックして<br>ここに学習データセットをストックしていきましょう！
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- 画像拡大用モーダル -->
+        <div id="image-modal" class="modal hidden">
+            <span id="modal-close" class="close-btn">&times;</span>
+            <img class="modal-content" id="modal-img">
+        </div>
+
+        <!-- 設定用モーダル -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-settings-content">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
+                    <h2 style="margin: 0; color: var(--accent-color);">Advanced Settings</h2>
+                    <span id="settings-close" class="close-btn" style="position: static; font-size: 28px; cursor: pointer;">&times;</span>
+                </div>
+                
+                <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- モデル選択 -->
+                    <div class="form-group">
+                        <label for="model-select">diffusion_models</label>
+                        <select id="model-select" style="width: 100%;">
+                            <option value="">Loading diffusion_models...</option>
+                        </select>
+                    </div>
+
+                    <!-- VAE選択 -->
+                    <div class="form-group">
+                        <label for="vae-select">VAE (Optional)</label>
+                        <select id="vae-select" style="width: 100%;">
+                            <option value="baked">None (Use Baked VAE)</option>
+                        </select>
+                    </div>
+
+                    <!-- Text Encoder (For Anima) -->
+                    <div class="form-group">
+                        <label for="clip-select">Text Encoder (CLIP for Anima)</label>
+                        <select id="clip-select" style="width: 100%;">
+                            <option value="default">Default</option>
+                        </select>
+                    </div>
+
+                    <!-- 翻訳用モデル -->
+                    <div class="form-group">
+                        <label for="ollama-model">Translation Model (Ollama)</label>
+                        <select id="ollama-model" style="width: 100%;">
+                            <option value="">Loading Ollama models...</option>
+                        </select>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <!-- メタタグ -->
+                    <div class="form-group">
+                        <label for="meta-tags-input" style="color: var(--accent-color);">Quality & Meta Tags (常に付与)</label>
+                        <textarea id="meta-tags-input" rows="2" style="width: 100%; resize: vertical; font-family: monospace; margin-top: 5px;">masterpiece, best quality, highres</textarea>
+                    </div>
+                    
+                    <!-- レーティング -->
+                    <div class="form-group">
+                        <label for="rating-select" style="color: var(--accent-color);">Rating</label>
+                        <select id="rating-select" style="width: 100%; margin-top: 5px;">
+                            <option value="safe" selected>Safe (一般)</option>
+                            <option value="sensitive">Sensitive (やや肌色)</option>
+                            <option value="nsfw">NSFW (背後注意)</option>
+                            <option value="explicit">Explicit (R-18)</option>
+                        </select>
+                    </div>
+
+                    <!-- ネガティブプロンプト -->
+                    <div class="form-group">
+                        <label for="negative-input">Negative Prompt</label>
+                        <textarea id="negative-input" style="width: 100%; height: 60px;">bad anatomy, worst quality, low quality, deformed, mutated</textarea>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="form-group row" style="display: flex; gap: 15px;">
+                        <div style="flex: 1;">
+                            <label for="steps">Steps</label>
+                            <input type="number" id="steps" value="20" min="1" max="100" style="width: 100%;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="cfg-scale">CFG Scale</label>
+                            <input type="number" id="cfg-scale" value="7.0" min="1.0" max="30.0" step="0.5" style="width: 100%;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="clip-skip">CLIP Skip</label>
+                            <input type="number" id="clip-skip" value="-2" min="-10" max="-1" style="width: 100%;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group row" style="display: flex; gap: 15px;">
+                        <div style="flex: 1;">
+                            <label for="sampler-name">Sampler</label>
+                            <select id="sampler-name" style="width: 100%;">
+                                <option value="euler">euler</option>
+                                <option value="euler_ancestral" selected>euler_ancestral</option>
+                                <option value="heun">heun</option>
+                                <option value="dpm_2">dpm_2</option>
+                                <option value="dpm_2_ancestral">dpm_2_ancestral</option>
+                                <option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option>
+                                <option value="dpmpp_2m">dpmpp_2m</option>
+                                <option value="dpmpp_sde">dpmpp_sde</option>
+                                <option value="dpmpp_2m_sde">dpmpp_2m_sde</option>
+                                <option value="dpmpp_3m_sde">dpmpp_3m_sde</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="scheduler">Scheduler</label>
+                            <select id="scheduler" style="width: 100%;">
+                                <option value="normal" selected>normal</option>
+                                <option value="karras">karras</option>
+                                <option value="exponential">exponential</option>
+                                <option value="sgm_uniform">sgm_uniform</option>
+                                <option value="simple">simple</option>
+                                <option value="ddim_uniform">ddim_uniform</option>
+                                <option value="beta">beta</option>
+                                <option value="beta57">beta57</option>
+                                <option value="normal_beta">normal_beta</option>
+                                <option value="kl_optimal">kl_optimal</option>
+                                <option value="lcm">lcm</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <!-- キャラクター＆衣装 プリセット(LoRA・マクロ辞書)管理 -->
+                    <div class="form-group" style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--accent-blue); padding: 15px; border-radius: 8px;">
+                        <h3 style="margin-top: 0; color: var(--accent-blue); font-size: 1.1em; display: flex; justify-content: space-between; align-items: center;">
+                            <span>🏷️ キャラクター＆服装 プリセット登録 (LoRA・タグ辞書)</span>
+                            <span style="font-size: 0.75em; opacity: 0.8; font-weight: normal;">先頭は # で登録してください</span>
+                        </h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                            <div style="display: flex; gap: 10px;">
+                                <div style="flex: 1;">
+                                    <label style="font-size: 0.85em;">登録タグ名 (例: #ボブ子, #制服)</label>
+                                    <input type="text" id="preset-name-input" placeholder="#ボブ子" style="width: 100%;" />
+                                </div>
+                                <div style="flex: 2;">
+                                    <label style="font-size: 0.85em;">展開する必須タグ (Tags カンマ区切り / 任意)</label>
+                                    <input type="text" id="preset-tags-input" placeholder="1girl, bob hair, brown hair, brown eyes, petite frame" style="width: 100%;" />
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-direction: column;">
+                                <label style="font-size: 0.85em;">展開する説明文 (Text/自然文プロンプト / 任意・Text欄へ展開)</label>
+                                <textarea id="preset-text-input" placeholder="A high school girl named Bobuko wearing a traditional sailor uniform, standing happily..." style="width: 100%; height: 55px; resize: vertical; font-family: monospace; font-size: 0.85em; background: rgba(0,0,0,0.5); padding: 6px; border-radius: 4px; border: 1px solid var(--border-color); color: #fff;"></textarea>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                                <div style="flex: 2;">
+                                    <label style="font-size: 0.85em;">連動させる LoRA モデル (ComfyUI)</label>
+                                    <select id="preset-lora-select" style="width: 100%;">
+                                        <option value="">なし (タグ展開のみ)</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 1;">
+                                    <label style="font-size: 0.85em;">LoRA 適用強度</label>
+                                    <input type="number" id="preset-lora-weight" value="0.80" min="0.05" max="2.00" step="0.05" style="width: 100%;" />
+                                </div>
+                                <div style="flex: 1;">
+                                    <button id="btn-save-preset" class="btn primary-btn" style="height: 38px; width: 100%; font-size: 0.9em; padding: 5px;">＋ 保存・更新</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="max-height: 250px; overflow-y: auto; border-top: 1px dashed var(--border-color); padding-top: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 5px;">
+                                <label style="font-size: 0.85em; opacity: 0.95;">登録済みプリセット一覧 <span style="color: #00ff88; font-size: 0.85em;">(PC内ファイル自動同期＆保護中 🛡️)</span></label>
+                                <div style="display: flex; gap: 6px;">
+                                    <button type="button" class="tag-action-btn" style="font-size: 0.8em; padding: 3px 8px; border-color: var(--accent-blue);" onclick="exportPresetsToFile()">💾 JSONファイルに書き出し</button>
+                                    <button type="button" class="tag-action-btn" style="font-size: 0.8em; padding: 3px 8px; border-color: #00ff88; color: #00ff88;" onclick="document.getElementById('preset-import-file').click()">📥 JSONファイルから復元</button>
+                                    <input type="file" id="preset-import-file" onchange="importPresetsFromFile(event)" accept=".json" style="display: none;" />
+                                </div>
+                            </div>
+                            <div id="presets-list-container" style="display: flex; flex-direction: column; gap: 6px;">
+                                <!-- Dynamically rendered presets go here -->
+                                <div style="text-align: center; opacity: 0.5; font-size: 0.85em; padding: 10px;">登録されているプリセットはありません。</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <script type="module" src="/src/app.js"></script>
+    </body>
+</html>

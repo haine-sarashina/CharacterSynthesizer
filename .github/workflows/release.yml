@@ -1,0 +1,50 @@
+name: Release CharacterSynthesizer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Install Frontend Dependencies
+        run: pnpm install
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build and Publish Tauri Release & Auto-Updater Metadata
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'CharacterSynthesizer ${{ github.ref_name }}'
+          releaseBody: |
+            ## CharacterSynthesizer 更新情報 (${{ github.ref_name }})
+            最新のアップグレードが適用されました。
+            - 既存ユーザーのアプリ上での自動アップデート (Tauri v2 Updater) に完全対応
+            - 下記アセットのインストーラー (NSIS/MSI) 等からダウンロードおよびクリーンインストールが可能です。
+          releaseDraft: false
+          releasePrerelease: false
