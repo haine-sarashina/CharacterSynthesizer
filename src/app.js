@@ -1958,7 +1958,7 @@ async function checkUpdateManually() {
             }
         } else {
             const { message } = await import('@tauri-apps/plugin-dialog');
-            await message("現在のバージョン (v0.3.0) は最新の状態です。", { title: "更新確認結果", kind: "info" });
+            await message("現在のバージョン (v0.3.1) は最新の状態です。", { title: "更新確認結果", kind: "info" });
             if (btn) btn.innerHTML = "🔄 アップデート確認";
         }
     } catch (e) {

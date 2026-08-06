@@ -14,7 +14,7 @@
         <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <h1 class="logo-text">CHARACTER_SYNTHESIZER</h1>
-                <span class="version-badge">v0.3.0</span>
+                <span class="version-badge">v0.3.1</span>
                 <button id="btn-check-update" class="tag-action-btn" onclick="checkUpdateManually()" title="オンラインで最新のリリースがあるか確認" style="font-size: 0.85em; padding: 4px 10px; cursor: pointer; background: rgba(255,255,255,0.1); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-color);">🔄 アップデート確認</button>
             </div>
             <div class="studio-tab-bar" style="display: flex; gap: 10px;">
@@ -34,47 +34,16 @@
                 <div class="panel-body">
 
                     <!-- プロンプト生成フロー -->
-                    <div class="form-group" style="border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; background: rgba(0,0,0,0.2);">
-                        <label for="magic-prompt" style="color: var(--accent-color);">1. 描きたい情景を入力 (日本語)</label>
-                        <textarea id="magic-prompt" placeholder="(例: 夜のサイバーパンクシティに立つ青い髪の少女。ネオンの光が反射している。高画質。)" rows="2" style="width: 100%; margin-bottom: 5px;"></textarea>
+                    <div class="form-group" style="border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; background: rgba(0,0,0,0.2); flex: 1; display: flex; flex-direction: column; gap: 12px;">
+                        <label for="magic-prompt" style="color: var(--accent-color); flex-shrink: 0;">1. 描きたい情景を入力 (日本語)</label>
+                        <textarea id="magic-prompt" placeholder="(例: 夜のサイバーパンクシティに立つ青い髪の少女。ネオンの光が反射している。高画質。)" style="width: 100%; flex: 1; min-height: 150px; resize: vertical; margin-bottom: 0;"></textarea>
                         
-                        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">
                             <button id="btn-magic-prompt" class="btn secondary-btn" onclick="generateAnimaPrompt()" style="width: 100%; padding: 12px; font-size: 1.1em;">
                                 <span class="icon">🪄</span> Generate Magic Prompt
                             </button>
                         </div>
                         
-                    </div>
-
-
-
-                    <!-- 画像サイズ設定 -->
-                    <div class="form-group row">
-                        <div>
-                            <label for="image-width">Width</label>
-                            <select id="image-width">
-                                <option value="512" selected>512</option>
-                                <option value="768">768</option>
-                                <option value="1024">1024</option>
-                                <option value="1280">1280</option>
-                                <option value="1536">1536</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="image-height">Height</label>
-                            <select id="image-height">
-                                <option value="512">512</option>
-                                <option value="768" selected>768</option>
-                                <option value="1024">1024</option>
-                                <option value="1280">1280</option>
-                                <option value="1536">1536</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="batch-size">Batch Size</label>
-                        <input type="number" id="batch-size" min="1" max="30" value="4" style="width: 100%;">
                     </div>
                 </div>
             </section>
@@ -138,12 +107,42 @@
                                 <!-- Final Prompt & Roll Column (幅広め) -->
                                 <div style="flex: 2.5; display: flex; flex-direction: column;">
                                     <label for="prompt-input" style="font-size: 0.85em; opacity: 0.8; color: var(--accent-color);">3. 最終プロンプト (クリックでコピー)</label>
-                                    <textarea id="prompt-input" placeholder="ここに成形されたプロンプトが出力されます。" readonly style="background: rgba(0,0,0,0.5); cursor: copy; flex: 1; height: 280px; resize: vertical; margin-bottom: 10px;" onclick="this.select(); document.execCommand('copy'); alert('Copied to clipboard!');"></textarea>
+                                    <textarea id="prompt-input" placeholder="ここに成形されたプロンプトが出力されます。" readonly style="background: rgba(0,0,0,0.5); cursor: copy; flex: 1; height: 240px; resize: vertical; margin-bottom: 10px;" onclick="this.select(); document.execCommand('copy'); alert('Copied to clipboard!');"></textarea>
                                     
-                                    <button id="generate-btn" class="btn primary-btn" disabled style="height: 60px; font-size: 1.2em;">
-                                        <span class="btn-text">Gacha Roll</span>
-                                        <span class="btn-glow"></span>
-                                    </button>
+                                    <div style="display: flex; gap: 12px; align-items: stretch; margin-top: auto;">
+                                        <!-- 画像サイズ・出力枚数設定 (Gacha Settings) -->
+                                        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; justify-content: center;">
+                                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                                <label for="image-width" style="margin: 0; min-width: 75px; flex-shrink: 0;">Width</label>
+                                                <select id="image-width" style="flex: 1; padding: 6px 10px; min-width: 0;">
+                                                    <option value="512" selected>512</option>
+                                                    <option value="768">768</option>
+                                                    <option value="1024">1024</option>
+                                                    <option value="1280">1280</option>
+                                                    <option value="1536">1536</option>
+                                                </select>
+                                            </div>
+                                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                                <label for="image-height" style="margin: 0; min-width: 75px; flex-shrink: 0;">Height</label>
+                                                <select id="image-height" style="flex: 1; padding: 6px 10px; min-width: 0;">
+                                                    <option value="512">512</option>
+                                                    <option value="768" selected>768</option>
+                                                    <option value="1024">1024</option>
+                                                    <option value="1280">1280</option>
+                                                    <option value="1536">1536</option>
+                                                </select>
+                                            </div>
+                                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                                <label for="batch-size" style="margin: 0; min-width: 75px; flex-shrink: 0;">Batch Size</label>
+                                                <input type="number" id="batch-size" min="1" max="30" value="4" style="flex: 1; padding: 6px 10px; min-width: 0;">
+                                            </div>
+                                        </div>
+
+                                        <button id="generate-btn" class="btn primary-btn" disabled style="flex: 1; margin: 0; font-size: 1.3em; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                                            <span class="btn-text">Gacha Roll</span>
+                                            <span class="btn-glow"></span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
