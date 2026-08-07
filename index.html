@@ -14,7 +14,7 @@
         <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <h1 class="logo-text">CHARACTER_SYNTHESIZER</h1>
-                <span class="version-badge">v0.3.1</span>
+                <span class="version-badge">v0.3.2</span>
                 <button id="btn-check-update" class="tag-action-btn" onclick="checkUpdateManually()" title="オンラインで最新のリリースがあるか確認" style="font-size: 0.85em; padding: 4px 10px; cursor: pointer; background: rgba(255,255,255,0.1); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-color);">🔄 アップデート確認</button>
             </div>
             <div class="studio-tab-bar" style="display: flex; gap: 10px;">
@@ -26,7 +26,7 @@
         <!-- メイングリッド (Gacha & Synthesis) -->
         <main id="view-gacha" class="main-content">
             <!-- 左側：コントロールパネル -->
-            <section class="control-panel panel">
+            <section id="control-panel" class="control-panel panel" style="width: 400px; flex-shrink: 0;">
                 <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <h2>GACHA_ROLL_SETTINGS</h2>
                     <button id="btn-open-settings" class="tag-action-btn" title="Open Settings" style="font-size: 1.2em; padding: 4px 8px;">⚙️</button>
@@ -34,7 +34,7 @@
                 <div class="panel-body">
 
                     <!-- プロンプト生成フロー -->
-                    <div class="form-group" style="border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; background: rgba(0,0,0,0.2); flex: 1; display: flex; flex-direction: column; gap: 12px;">
+                    <div class="form-group" style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
                         <label for="magic-prompt" style="color: var(--accent-color); flex-shrink: 0;">1. 描きたい情景を入力 (日本語)</label>
                         <textarea id="magic-prompt" placeholder="(例: 夜のサイバーパンクシティに立つ青い髪の少女。ネオンの光が反射している。高画質。)" style="width: 100%; flex: 1; min-height: 150px; resize: vertical; margin-bottom: 0;"></textarea>
                         
@@ -48,8 +48,11 @@
                 </div>
             </section>
 
+            <!-- リサイザー (左ペイン幅調整) -->
+            <div id="drag-resizer" class="resizer"></div>
+
             <!-- 中央：ビューポート（ガチャ結果＆合成プレビュー） -->
-            <section class="viewport-area">
+            <section class="viewport-area" style="flex: 1; min-width: 0;">
                 <!-- タスク進行インジケーター -->
                 <div id="progress-container" class="progress-container hidden">
                     <div class="progress-info">

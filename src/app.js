@@ -1958,7 +1958,7 @@ async function checkUpdateManually() {
             }
         } else {
             const { message } = await import('@tauri-apps/plugin-dialog');
-            await message("現在のバージョン (v0.3.1) は最新の状態です。", { title: "更新確認結果", kind: "info" });
+            await message("現在のバージョン (v0.3.2) は最新の状態です。", { title: "更新確認結果", kind: "info" });
             if (btn) btn.innerHTML = "🔄 アップデート確認";
         }
     } catch (e) {
@@ -1983,3 +1983,33 @@ window.clearLoraCart = clearLoraCart;
 window.exportPresetsToFile = exportPresetsToFile;
 window.importPresetsFromFile = importPresetsFromFile;
 window.checkUpdateManually = checkUpdateManually;
+
+// --- Layout Resizer ---
+const resizer = document.getElementById('drag-resizer');
+const leftPanel = document.getElementById('control-panel');
+let isResizing = false;
+
+if (resizer && leftPanel) {
+    resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        let newWidth = e.clientX;
+        if (newWidth < 250) newWidth = 250;
+        if (newWidth > window.innerWidth * 0.7) newWidth = window.innerWidth * 0.7;
+        leftPanel.style.width = `${newWidth}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            resizer.classList.remove('dragging');
+            document.body.style.cursor = '';
+        }
+    });
+}

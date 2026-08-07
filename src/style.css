@@ -86,15 +86,35 @@ body {
 }
 
 .main-content {
-    display: grid;
-    grid-template-columns: 400px minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    align-content: start;
+    display: flex;
     align-items: stretch;
-    gap: 16px;
     flex: 1;
     min-height: 0; /* 親グリッド内での縮小を可能にする */
     min-width: 0;
+}
+
+.resizer {
+    width: 16px;
+    cursor: col-resize;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+}
+
+.resizer::after {
+    content: '';
+    width: 4px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    transition: background 0.2s;
+}
+
+.resizer:hover::after, .resizer.dragging::after {
+    background: var(--accent-color);
 }
 
 /* Panel Styles (Glassmorphism) */
