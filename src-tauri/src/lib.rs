@@ -1,9 +1,9 @@
 use std::fs;
 use std::io::Read;
 use base64::Engine;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetItem {
     #[serde(default)]
@@ -16,7 +16,7 @@ pub struct DatasetItem {
     pub caption: String,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportDatasetArgs {
     pub lora_name: String,
@@ -24,6 +24,22 @@ pub struct ExportDatasetArgs {
     pub repeats: u32,
     #[serde(default)]
     pub items: Vec<DatasetItem>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartTrainingArgs {
+    pub lora_name: String,
+    pub trigger_word: String,
+    pub repeats: u32,
+    #[serde(default)]
+    pub items: Vec<DatasetItem>,
+    pub sd_scripts_path: String,
+    pub base_model_path: String,
+    pub epochs: u32,
+    pub batch_size: u32,
+    pub network_dim: u32,
+    pub network_alpha: u32,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -172,6 +188,127 @@ pause
     })
 }
 
+#[tauri::command]
+fn start_lora_training(app: tauri::AppHandle, args: StartTrainingArgs) -> Result<ExportResponse, String> {
+    let export_args = ExportDatasetArgs {
+        lora_name: args.lora_name.clone(),
+        trigger_word: args.trigger_word.clone(),
+        repeats: args.repeats,
+        items: args.items.clone(),
+    };
+    
+    let export_res = export_lora_dataset(app.clone(), export_args)?;
+    let base_dir = std::path::PathBuf::from(&export_res.dataset_dir);
+    
+    let config_toml_content = format!(
+r#"[model_arguments]
+pretrained_model_name_or_path = "{}"
+
+[additional_network_arguments]
+network_module = "networks.lora"
+network_dim = {}
+network_alpha = {}
+
+[optimizer_arguments]
+optimizer_type = "AdamW8bit"
+learning_rate = 1e-4
+
+[dataset_arguments]
+dataset_config = "{}"
+
+[training_arguments]
+output_dir = "{}"
+output_name = "{}"
+save_precision = "fp16"
+save_model_as = "safetensors"
+max_train_epochs = {}
+train_batch_size = {}
+xformers = true
+mixed_precision = "fp16"
+"#, 
+        args.base_model_path.replace('\\', "/"), 
+        args.network_dim, 
+        args.network_alpha, 
+        base_dir.join("dataset_config.toml").display().to_string().replace('\\', "/"),
+        base_dir.join("model").display().to_string().replace('\\', "/"),
+        args.lora_name,
+        args.epochs,
+        args.batch_size
+    );
+
+    let config_path = base_dir.join("config.toml");
+    std::fs::write(&config_path, config_toml_content).map_err(|e| e.to_string())?;
+
+    let sd_scripts_path = std::path::PathBuf::from(args.sd_scripts_path.clone());
+    let python_exe = sd_scripts_path.join("venv").join("Scripts").join("python.exe");
+    let script_path = sd_scripts_path.join("train_network.py");
+
+    let app_handle = app.clone();
+    
+    std::thread::spawn(move || {
+        use std::io::{BufRead, BufReader};
+        use std::process::{Command, Stdio};
+        
+        let mut cmd = Command::new(&python_exe);
+        cmd.arg(&script_path)
+           .arg("--config_file")
+           .arg(&config_path);
+           
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+        
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+           
+        if let Ok(mut child) = cmd.spawn() {
+            if let Some(stdout) = child.stdout.take() {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(l) = line {
+                        let mut percent = None;
+                        if let Some(idx) = l.find("%|") {
+                            let start_idx = l[..idx].rfind(|c: char| !c.is_numeric()).map(|i| i + 1).unwrap_or(0);
+                            let num_str = l[start_idx..idx].trim();
+                            if let Ok(p) = num_str.parse::<u32>() {
+                                percent = Some(p);
+                            }
+                        }
+                        
+                        let payload = serde_json::json!({
+                            "status": l,
+                            "percent": percent
+                        });
+                        let _ = app_handle.emit("lora-training-progress", payload);
+                    }
+                }
+            }
+            
+            let status_code = child.wait().unwrap_or_else(|_| std::process::ExitStatus::default());
+            let result_status = if status_code.success() { "FINISHED" } else { "ERROR" };
+            
+            let payload = serde_json::json!({
+                "status": result_status,
+                "percent": 100
+            });
+            let _ = app_handle.emit("lora-training-progress", payload);
+        } else {
+            let payload = serde_json::json!({
+                "status": "ERROR",
+                "message": "Failed to spawn Python process. Is sd-scripts setup properly?"
+            });
+            let _ = app_handle.emit("lora-training-progress", payload);
+        }
+    });
+
+    Ok(ExportResponse {
+        status: "success".to_string(),
+        message: "Training started".to_string(),
+        dataset_dir: base_dir.to_string_lossy().to_string(),
+    })
+}
+
 fn silent_command(program: &str) -> std::process::Command {
     let mut cmd = std::process::Command::new(program);
     #[cfg(target_os = "windows")]
@@ -223,15 +360,20 @@ fn ollama_models() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn ollama_generate(model: String, prompt: String, system: String) -> Result<String, String> {
-    let payload = serde_json::json!({
-        "model": model,
-        "prompt": prompt,
-        "system": system,
-        "stream": false,
-        "format": "json",
-        "options": { "temperature": 0.3 }
-    });
+fn ollama_generate(model: String, prompt: String, system: String, keep_alive: bool) -> Result<String, String> {
+    let mut payload_map = serde_json::Map::new();
+    payload_map.insert("model".to_string(), serde_json::json!(model));
+    payload_map.insert("prompt".to_string(), serde_json::json!(prompt));
+    payload_map.insert("system".to_string(), serde_json::json!(system));
+    payload_map.insert("stream".to_string(), serde_json::json!(false));
+    payload_map.insert("format".to_string(), serde_json::json!("json"));
+    payload_map.insert("options".to_string(), serde_json::json!({ "temperature": 0.3 }));
+
+    if keep_alive {
+        payload_map.insert("keep_alive".to_string(), serde_json::json!(-1));
+    }
+
+    let payload = serde_json::Value::Object(payload_map);
 
     let resp = ureq::post("http://localhost:11434/api/generate")
         .set("Content-Type", "application/json")
@@ -262,6 +404,7 @@ pub fn run() {
             load_app_data,
             save_app_data,
             export_lora_dataset,
+            start_lora_training,
             ollama_models,
             ollama_generate
         ])

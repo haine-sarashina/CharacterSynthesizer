@@ -305,10 +305,12 @@ Example JSON output:
     
     try {
         const ollamaModel = document.getElementById('ollama-model').value;
+        const ollamaKeepAlive = document.getElementById('ollama-keep-alive')?.checked || false;
         const respText = await invoke("ollama_generate", {
             model: ollamaModel,
             prompt: magicInput,
-            system: systemPrompt
+            system: systemPrompt,
+            keepAlive: ollamaKeepAlive
         });
         console.log("Ollama raw response via Rust IPC:", respText);
         
@@ -417,44 +419,7 @@ function saveCustomPresets() {
     });
 }
 
-function exportPresetsToFile() {
-    if (Object.keys(customPresets).length === 0) {
-        alert("書き出しできるプリセットがありません。");
-        return;
-    }
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(customPresets, null, 4));
-    const downloadAnchor = document.createElement("a");
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", "anima_presets_backup.json");
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-}
 
-function importPresetsFromFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const imported = JSON.parse(e.target.result);
-            if (imported && typeof imported === "object") {
-                let count = 0;
-                for (const k in imported) {
-                    customPresets[k] = imported[k];
-                    count++;
-                }
-                saveCustomPresets();
-                alert(`🎉 【復元成功！】 外部JSONファイルから ${count} 件のプリセットを復元・統合し、PC内に保存しました！`);
-            } else {
-                alert("有効なプリセット保存JSONファイルではありませんでした。");
-            }
-        } catch (err) {
-            alert(`読み込み中にエラーが発生しました: ${err.message}`);
-        }
-    };
-    reader.readAsText(file);
-}
 
 
 function renderPresetsList() {
@@ -882,8 +847,53 @@ async function loadVAEs() {
             });
         }
     } catch (e) {
-        console.warn("Failed to load VAEs.", e);
-    }
+        console.log("WebSocket connected!");
+    };
+    
+    // Setup LoRA progress listener
+    try {
+        const { listen } = await import('@tauri-apps/api/event');
+        listen('lora-training-progress', (event) => {
+            const payload = event.payload;
+            const progressContainer = document.getElementById("training-progress-container");
+            const statusText = document.getElementById("training-status-text");
+            const percentText = document.getElementById("training-percent-text");
+            const progressBar = document.getElementById("training-progress-bar");
+            
+            if (progressContainer) progressContainer.classList.remove("hidden");
+            if (statusText) statusText.textContent = payload.status || "Training...";
+            
+            if (payload.percent !== undefined) {
+                if (progressBar) progressBar.style.width = payload.percent + "%";
+                if (percentText) percentText.textContent = payload.percent + "%";
+            }
+            
+            if (payload.status === "FINISHED" || payload.status === "ERROR") {
+                const btn = document.getElementById("btn-start-training");
+                const exportBtn = document.getElementById("btn-export-dataset");
+                if (btn) btn.disabled = false;
+                if (exportBtn) exportBtn.disabled = false;
+                
+                const statusMsg = document.getElementById("export-status-msg");
+                if (payload.status === "FINISHED") {
+                    if (statusMsg) statusMsg.textContent = "✅ 学習が完了しました！";
+                    alert("学習が正常に終了しました！\nモデルフォルダをご確認ください。");
+                } else {
+                    if (statusMsg) statusMsg.textContent = "❌ 学習中にエラーが発生しました。";
+                    alert("学習プロセスがエラー終了しました。ログを確認してください。");
+                }
+            }
+        });
+    } catch(e) { console.error(e); }
+    
+    // Attach change events for LoRA config inputs
+    ["lora-sd-scripts-path", "lora-base-model-path", "lora-epochs", "lora-batch-size", "lora-network-dim", "lora-network-alpha"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("change", saveSettings);
+            el.addEventListener("input", saveSettings);
+        }
+    });
 }
 
 // Load LoRAs from ComfyUI
@@ -935,6 +945,7 @@ function saveSettings() {
         vae: vaeSelect.value,
         clip: clipSelect.value,
         ollamaModel: ollamaModelSelect.value,
+        ollamaKeepAlive: document.getElementById('ollama-keep-alive')?.checked,
         prompt: promptInput.value,
         tagsConfirm: getTagsFromUI().join('\n'),
         textConfirm: textConfirmArea.value,
@@ -949,7 +960,13 @@ function saveSettings() {
         batchSize: batchSizeInput.value,
         steps: stepsInput.value,
         cfg: cfgInput.value,
-        clipSkip: clipSkipInput ? clipSkipInput.value : -2
+        clipSkip: clipSkipInput ? clipSkipInput.value : -2,
+        loraSdScriptsPath: document.getElementById("lora-sd-scripts-path")?.value,
+        loraBaseModelPath: document.getElementById("lora-base-model-path")?.value,
+        loraEpochs: document.getElementById("lora-epochs")?.value,
+        loraBatchSize: document.getElementById("lora-batch-size")?.value,
+        loraNetworkDim: document.getElementById("lora-network-dim")?.value,
+        loraNetworkAlpha: document.getElementById("lora-network-alpha")?.value
     };
     diskSave("gacha_settings", settings);
 }
@@ -962,6 +979,10 @@ async function loadSettings() {
             if (settings.vae) setSelectValue(vaeSelect, settings.vae);
             if (settings.clip) setSelectValue(clipSelect, settings.clip);
             if (settings.ollamaModel) setSelectValue(ollamaModelSelect, settings.ollamaModel);
+            if (settings.ollamaKeepAlive !== undefined) {
+                const el = document.getElementById('ollama-keep-alive');
+                if (el) el.checked = settings.ollamaKeepAlive;
+            }
             if (settings.prompt) {
                 promptInput.value = settings.prompt;
                 if (settings.prompt.trim().length > 0) {
@@ -982,6 +1003,12 @@ async function loadSettings() {
             if (settings.negative) negativeInput.value = settings.negative;
             if (settings.width) imageWidthSelect.value = settings.width;
             if (settings.height) imageHeightSelect.value = settings.height;
+            if (settings.loraSdScriptsPath) { const el = document.getElementById("lora-sd-scripts-path"); if(el) el.value = settings.loraSdScriptsPath; }
+            if (settings.loraBaseModelPath) { const el = document.getElementById("lora-base-model-path"); if(el) el.value = settings.loraBaseModelPath; }
+            if (settings.loraEpochs) { const el = document.getElementById("lora-epochs"); if(el) el.value = settings.loraEpochs; }
+            if (settings.loraBatchSize) { const el = document.getElementById("lora-batch-size"); if(el) el.value = settings.loraBatchSize; }
+            if (settings.loraNetworkDim) { const el = document.getElementById("lora-network-dim"); if(el) el.value = settings.loraNetworkDim; }
+            if (settings.loraNetworkAlpha) { const el = document.getElementById("lora-network-alpha"); if(el) el.value = settings.loraNetworkAlpha; }
         } catch(e) {}
     }
 }
@@ -995,6 +1022,11 @@ async function loadSettings() {
         }
     }
 });
+
+const ollamaKeepAliveCheckbox = document.getElementById('ollama-keep-alive');
+if (ollamaKeepAliveCheckbox) {
+    ollamaKeepAliveCheckbox.addEventListener('change', saveSettings);
+}
 
 // WebSockets
 let ws = null;
@@ -1177,30 +1209,6 @@ function renderCandidates() {
         viewBtn.innerHTML = "&#128269; Enlarge";
         viewBtn.onclick = () => openModal(candidate.url);
         
-        const baseBtn = document.createElement("button");
-        baseBtn.className = "overlay-btn";
-        baseBtn.innerText = "Set as Base";
-        baseBtn.onclick = () => {
-            baseImageUrl = candidate.url;
-            baseFilename = candidate.filename;
-            basePreviewImg.src = baseImageUrl;
-            basePreviewImg.classList.remove("hidden");
-            basePlaceholder.classList.add("hidden");
-            checkReady();
-        };
-        
-        const partBtn = document.createElement("button");
-        partBtn.className = "overlay-btn";
-        partBtn.innerText = "Set as Part";
-        partBtn.onclick = () => {
-            partImageUrl = candidate.url;
-            partFilename = candidate.filename;
-            partPreviewImg.src = partImageUrl;
-            partPreviewImg.classList.remove("hidden");
-            partPlaceholder.classList.add("hidden");
-            checkReady();
-        };
-        
         const stockBtn = document.createElement("button");
         stockBtn.className = "overlay-btn";
         stockBtn.style.background = "linear-gradient(135deg, rgba(121, 40, 202, 0.8), rgba(0, 195, 255, 0.8))";
@@ -1215,8 +1223,6 @@ function renderCandidates() {
         };
         
         overlay.appendChild(viewBtn);
-        overlay.appendChild(baseBtn);
-        overlay.appendChild(partBtn);
         overlay.appendChild(stockBtn);
         card.appendChild(img);
         card.appendChild(overlay);
@@ -1456,30 +1462,6 @@ function renderLibrary() {
         viewBtn.innerHTML = "&#128269; Enlarge";
         viewBtn.onclick = () => openModal(url);
         
-        const baseBtn = document.createElement("button");
-        baseBtn.className = "overlay-btn";
-        baseBtn.innerText = "Set as Base";
-        baseBtn.onclick = () => {
-            baseImageUrl = url;
-            baseFilename = asset.filename;
-            basePreviewImg.src = baseImageUrl;
-            basePreviewImg.classList.remove("hidden");
-            basePlaceholder.classList.add("hidden");
-            checkReady();
-        };
-        
-        const partBtn = document.createElement("button");
-        partBtn.className = "overlay-btn";
-        partBtn.innerText = "Set as Part";
-        partBtn.onclick = () => {
-            partImageUrl = url;
-            partFilename = asset.filename;
-            partPreviewImg.src = partImageUrl;
-            partPreviewImg.classList.remove("hidden");
-            partPlaceholder.classList.add("hidden");
-            checkReady();
-        };
-        
         const delBtn = document.createElement("button");
         delBtn.className = "overlay-btn";
         delBtn.style.backgroundColor = "rgba(255, 0, 0, 0.5)";
@@ -1495,8 +1477,6 @@ function renderLibrary() {
         };
         
         overlay.appendChild(viewBtn);
-        overlay.appendChild(baseBtn);
-        overlay.appendChild(partBtn);
         overlay.appendChild(delBtn);
         
         const label = document.createElement("div");
@@ -1980,9 +1960,79 @@ window.formatFinalPrompt = formatFinalPrompt;
 window.applyTriggerWordToAll = applyTriggerWordToAll;
 window.exportLoraDataset = exportLoraDataset;
 window.clearLoraCart = clearLoraCart;
-window.exportPresetsToFile = exportPresetsToFile;
-window.importPresetsFromFile = importPresetsFromFile;
 window.checkUpdateManually = checkUpdateManually;
+
+window.startLoraTraining = async function() {
+    if (loraDatasetCart.length === 0) {
+        alert("学習データがストックされていません！ガチャ画像からストックしてください。");
+        return;
+    }
+    
+    const loraName = (document.getElementById("lora-dataset-name")?.value || "my_character").trim();
+    const triggerWord = (document.getElementById("lora-trigger-word")?.value || "custom_chr").trim();
+    const repeats = parseInt(document.getElementById("lora-repeats")?.value || "20");
+    const sdScriptsPath = document.getElementById("lora-sd-scripts-path")?.value.trim();
+    const baseModelPath = document.getElementById("lora-base-model-path")?.value.trim();
+    const epochs = parseInt(document.getElementById("lora-epochs")?.value || "10");
+    const batchSize = parseInt(document.getElementById("lora-batch-size")?.value || "1");
+    const networkDim = parseInt(document.getElementById("lora-network-dim")?.value || "32");
+    const networkAlpha = parseInt(document.getElementById("lora-network-alpha")?.value || "16");
+    
+    if (!sdScriptsPath) {
+        alert("sd-scripts フォルダパスを指定してください。");
+        return;
+    }
+    if (!baseModelPath) {
+        alert("ベースモデルパスを指定してください。");
+        return;
+    }
+    
+    const btn = document.getElementById("btn-start-training");
+    const exportBtn = document.getElementById("btn-export-dataset");
+    const statusMsg = document.getElementById("export-status-msg");
+    const progressContainer = document.getElementById("training-progress-container");
+    const statusText = document.getElementById("training-status-text");
+    const percentText = document.getElementById("training-percent-text");
+    const progressBar = document.getElementById("training-progress-bar");
+    
+    try {
+        if (btn) btn.disabled = true;
+        if (exportBtn) exportBtn.disabled = true;
+        if (statusMsg) statusMsg.textContent = "⌛ データセット生成 ＆ 学習準備中...";
+        if (progressContainer) progressContainer.classList.remove("hidden");
+        if (statusText) statusText.textContent = "Initializing Dataset...";
+        if (progressBar) progressBar.style.width = "0%";
+        if (percentText) percentText.textContent = "0%";
+        
+        const payload = {
+            loraName: loraName,
+            triggerWord: triggerWord,
+            repeats: repeats,
+            items: loraDatasetCart,
+            sdScriptsPath: sdScriptsPath,
+            baseModelPath: baseModelPath,
+            epochs: epochs,
+            batchSize: batchSize,
+            networkDim: networkDim,
+            networkAlpha: networkAlpha
+        };
+        
+        const result = await invoke("start_lora_training", { args: payload });
+        
+        if (result && result.status === "success") {
+            if (statusMsg) statusMsg.textContent = "✨ 学習プロセスをバックグラウンドで開始しました！";
+        } else {
+            throw new Error((result && result.message) || "エラーが発生しました");
+        }
+    } catch (err) {
+        console.error("Training Error:", err);
+        alert("学習の開始に失敗しました:\n" + err.message);
+        if (statusMsg) statusMsg.textContent = "❌ エラーが発生しました。";
+        if (btn) btn.disabled = false;
+        if (exportBtn) exportBtn.disabled = false;
+        if (progressContainer) progressContainer.classList.add("hidden");
+    }
+};
 
 // --- Layout Resizer ---
 const resizer = document.getElementById('drag-resizer');
