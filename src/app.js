@@ -258,6 +258,11 @@ async function generateAnimaPrompt() {
     
     setUIBusy(true);
     btn.innerHTML = '<span class="icon">✨</span> Generating...';
+    
+    // 既存のタグとテキストを保持
+    const existingTags = getTagsFromUI();
+    const existingText = textConfirmArea.value;
+    
     promptInput.value = ""; // Clear Positive Prompt
     renderTags([]);
     textConfirmArea.value = "";
@@ -379,12 +384,46 @@ Example JSON output:
             }
         }
         
-        if (jsonResponse.tags && Array.isArray(jsonResponse.tags)) {
-            renderTags(jsonResponse.tags);
+        let finalTags = Array.isArray(jsonResponse.tags) ? [...existingTags, ...jsonResponse.tags] : [...existingTags];
+        
+        let finalTexts = existingText.split('\n').map(t => t.trim()).filter(t => t.length > 0);
+        if (Array.isArray(jsonResponse.text)) {
+            finalTexts = [...finalTexts, ...jsonResponse.text];
         }
-        if (jsonResponse.text && Array.isArray(jsonResponse.text)) {
-            textConfirmArea.value = jsonResponse.text.join('\n');
-        }
+        
+        // Expand presets based on Magic Prompt input and Ollama output
+        const magicStr = magicInput.toLowerCase();
+        Object.keys(customPresets).forEach(presetName => {
+            const pLower = presetName.toLowerCase();
+            const foundInTags = finalTags.some(t => t.toLowerCase() === pLower);
+            const foundInText = finalTexts.join('\n').toLowerCase().includes(pLower);
+            const foundInMagic = magicStr.includes(pLower);
+            
+            if (foundInTags || foundInText || foundInMagic) {
+                // Remove the preset name itself if Ollama output it as a tag
+                finalTags = finalTags.filter(t => t.toLowerCase() !== pLower);
+                
+                const preset = customPresets[presetName];
+                if (preset.tags && preset.tags.length > 0) {
+                    preset.tags.forEach(subTag => {
+                        if (!finalTags.includes(subTag)) {
+                            finalTags.push(subTag);
+                        }
+                    });
+                }
+                
+                if (preset.text && preset.text.trim()) {
+                    const presetTxt = preset.text.trim();
+                    if (!finalTexts.includes(presetTxt)) {
+                        finalTexts.push(presetTxt);
+                    }
+                }
+            }
+        });
+        
+        finalTags = [...new Set(finalTags)];
+        renderTags(finalTags);
+        textConfirmArea.value = finalTexts.join('\n');
         
         saveSettings();
         
