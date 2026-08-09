@@ -384,12 +384,13 @@ Example JSON output:
             }
         }
         
-        let finalTags = Array.isArray(jsonResponse.tags) ? [...existingTags, ...jsonResponse.tags] : [...existingTags];
+        // In v0.3.4, Generate Magic Prompt overwrote the UI. We restore this behavior to prevent stacking previous generations.
+        // We only preserve unexpanded presets (#...) in case the user manually added them to the UI before generating.
+        const unexpandedTagPresets = existingTags.filter(t => t.startsWith('#'));
+        let finalTags = Array.isArray(jsonResponse.tags) ? [...unexpandedTagPresets, ...jsonResponse.tags] : [...unexpandedTagPresets];
         
-        let finalTexts = existingText.split('\n').map(t => t.trim()).filter(t => t.length > 0);
-        if (Array.isArray(jsonResponse.text)) {
-            finalTexts = [...finalTexts, ...jsonResponse.text];
-        }
+        const unexpandedTextPresets = existingText.split('\n').map(t => t.trim()).filter(t => t.startsWith('#'));
+        let finalTexts = Array.isArray(jsonResponse.text) ? [...unexpandedTextPresets, ...jsonResponse.text] : [...unexpandedTextPresets];
         
         // Expand presets based on Magic Prompt input and Ollama output
         const magicStr = magicInput.toLowerCase();
