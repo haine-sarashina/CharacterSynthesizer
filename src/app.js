@@ -651,13 +651,9 @@ function formatFinalPrompt() {
         const pLower = presetName.toLowerCase();
         const foundInTags = expandedTags.some(t => t.toLowerCase() === pLower);
         const foundInText = textConfirmArea && textConfirmArea.value.toLowerCase().includes(pLower);
-        const foundInMagic = magicPromptInput && magicPromptInput.value.toLowerCase().includes(pLower);
-        const foundInFinal = promptInput && promptInput.value.toLowerCase().includes(pLower);
         
-        if (foundInTags || foundInText || foundInMagic || foundInFinal) {
-            if (!expandedTags.some(t => t.toLowerCase() === pLower)) {
-                expandedTags.push(presetName);
-            }
+        if (foundInTags || foundInText) {
+            expandedTags = expandedTags.filter(t => t.toLowerCase() !== pLower);
             const preset = customPresets[presetName];
             if (preset.tags && preset.tags.length > 0) {
                 preset.tags.forEach(subTag => {
