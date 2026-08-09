@@ -1569,6 +1569,13 @@ async function init() {
     await loadCustomPresets();
     renderLibrary();
 
+    try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().show();
+    } catch (e) {
+        console.warn("Failed to show window", e);
+    }
+
     // 起動時の自動アップデート監視
     setTimeout(async () => {
         try {
