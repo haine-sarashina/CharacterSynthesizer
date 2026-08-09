@@ -1122,7 +1122,7 @@ generateBtn.addEventListener("click", async () => {
             },
             "class_type": "KSampler"
         },
-        "4": { "inputs": { "unet_name": modelSelect.value, "weight_dtype": "default" }, "class_type": "UNETLoader" },
+        "4": { "inputs": { "unet_name": modelSelect.value, "weight_dtype": "fp8_e4m3fn" }, "class_type": "UNETLoader" },
         "5": { "inputs": { "clip_name": clipSelect.value !== "default" ? clipSelect.value : "qwen_3_06b_base.safetensors", "type": "stable_diffusion", "device": "default" }, "class_type": "CLIPLoader" },
         "6": { "inputs": { "vae_name": "qwen_image_vae.safetensors" }, "class_type": "VAELoader" },
         "7": { "inputs": { "width": width, "height": height, "batch_size": batchSize }, "class_type": "EmptyLatentImage" },
