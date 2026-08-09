@@ -2020,7 +2020,9 @@ async function checkUpdateManually() {
             }
         } else {
             const { message } = await import('@tauri-apps/plugin-dialog');
-            await message("現在のバージョン (v0.3.2) は最新の状態です。", { title: "更新確認結果", kind: "info" });
+            const { getVersion } = await import('@tauri-apps/api/app');
+            const currentVersion = await getVersion();
+            await message(`現在のバージョン (v${currentVersion}) は最新の状態です。`, { title: "更新確認結果", kind: "info" });
             if (btn) btn.innerHTML = "🔄 アップデート確認";
         }
     } catch (e) {
