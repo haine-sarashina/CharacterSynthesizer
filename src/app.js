@@ -1176,7 +1176,7 @@ generateBtn.addEventListener("click", async () => {
     }
     // Cache node classes for profiler
     window.currentWorkflowNodes = {};
-    for (const [id, node] of Object.entries(payload.prompt)) {
+    for (const [id, node] of Object.entries(workflow)) {
         window.currentWorkflowNodes[id] = node.class_type;
     }
     
@@ -1351,7 +1351,7 @@ synthesizeBtn.addEventListener("click", async () => {
     }
     // Cache node classes for profiler
     window.currentWorkflowNodes = {};
-    for (const [id, node] of Object.entries(payload.prompt)) {
+    for (const [id, node] of Object.entries(workflow)) {
         window.currentWorkflowNodes[id] = node.class_type;
     }
     
