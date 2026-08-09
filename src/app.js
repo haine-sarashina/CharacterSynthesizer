@@ -1030,6 +1030,10 @@ if (ollamaKeepAliveCheckbox) {
 
 // WebSockets
 let ws = null;
+let profilerStartTime = 0;
+let profilerCurrentNode = null;
+window.currentWorkflowNodes = window.currentWorkflowNodes || {};
+
 function connectWebSocket() {
     ws = new WebSocket(`ws://${SERVER_URL}/ws?clientId=${CLIENT_ID}`);
     ws.onmessage = (event) => {
@@ -1037,8 +1041,30 @@ function connectWebSocket() {
         if (data.type === "progress") {
             const val = Math.round((data.data.value / data.data.max) * 100);
             updateProgressBar(val, `Processing... (${val}%)`);
-        } else if (data.type === "executing" && data.data.node === null) {
-            hideProgressBar();
+        } else if (data.type === "executing") {
+            const now = Date.now();
+            const profilerEl = document.getElementById("profiler-log");
+            
+            // Record time for previous node
+            if (profilerCurrentNode !== null && data.data.node !== profilerCurrentNode) {
+                const elapsed = ((now - profilerStartTime) / 1000).toFixed(2);
+                const className = window.currentWorkflowNodes[profilerCurrentNode] || `Node ${profilerCurrentNode}`;
+                console.log(`[Profiler] ${className} took ${elapsed}s`);
+                if (profilerEl) {
+                    profilerEl.textContent = `Completed: ${className} (${elapsed}s)`;
+                }
+            }
+            
+            if (data.data.node === null) {
+                hideProgressBar();
+                profilerCurrentNode = null;
+                if (profilerEl) {
+                    setTimeout(() => { if (profilerCurrentNode === null) profilerEl.textContent = ""; }, 5000);
+                }
+            } else {
+                profilerCurrentNode = data.data.node;
+                profilerStartTime = now;
+            }
         }
     };
     ws.onclose = () => { setTimeout(connectWebSocket, 2000); };
@@ -1147,6 +1173,11 @@ generateBtn.addEventListener("click", async () => {
         workflow["8"].inputs.clip = currentClipLink;
         workflow["9"].inputs.clip = currentClipLink;
         console.log(`Attached ${lorasToLoad.length} LoRA model(s) dynamically via #presets.`);
+    }
+    // Cache node classes for profiler
+    window.currentWorkflowNodes = {};
+    for (const [id, node] of Object.entries(payload.prompt)) {
+        window.currentWorkflowNodes[id] = node.class_type;
     }
     
     try {
@@ -1317,6 +1348,11 @@ synthesizeBtn.addEventListener("click", async () => {
         workflow["99"] = { "inputs": { "vae_name": vaeSelect.value }, "class_type": "VAELoader" };
         workflow["8"].inputs.vae = ["99", 0];
         workflow["12"].inputs.vae = ["99", 0];
+    }
+    // Cache node classes for profiler
+    window.currentWorkflowNodes = {};
+    for (const [id, node] of Object.entries(payload.prompt)) {
+        window.currentWorkflowNodes[id] = node.class_type;
     }
     
     try {
