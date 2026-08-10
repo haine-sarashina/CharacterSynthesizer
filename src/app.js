@@ -274,6 +274,7 @@ Your task is to translate the user's Japanese description into an English prompt
 CRITICAL RULE 1: ALL outputs MUST be in English ONLY. Do NOT output ANY Japanese or Chinese characters.
 CRITICAL RULE 2: Output ONLY a valid JSON object. Do NOT output ANY "thinking process", "thought process", explanations, or conversational text. Provide ONLY the JSON.
 CRITICAL RULE 3: The "tags" array MUST contain ONLY short Danbooru-style tags (maximum 1-3 words). ABSOLUTELY NO sentences, verbs, or prepositional phrases. 
+CRITICAL RULE 4: DO NOT OMIT ANY DETAILS. You must exhaustively translate EVERY SINGLE concept, clothing item, background element, and action provided by the user into tags. Do NOT summarize or skip anything.
 BAD TAGS: "a girl with red hair", "she is standing", "looking at the viewer", "in the city"
 GOOD TAGS: "1girl", "red hair", "standing", "looking at viewer", "city"
 Do NOT make up random clothing, weapons, or backgrounds unless implied. 
@@ -1158,7 +1159,7 @@ generateBtn.addEventListener("click", async () => {
             },
             "class_type": "KSampler"
         },
-        "4": { "inputs": { "unet_name": modelSelect.value, "weight_dtype": "fp8_e4m3fn" }, "class_type": "UNETLoader" },
+        "4": { "inputs": { "unet_name": modelSelect.value, "weight_dtype": "default" }, "class_type": "UNETLoader" },
         "5": { "inputs": { "clip_name": clipSelect.value !== "default" ? clipSelect.value : "qwen_3_06b_base.safetensors", "type": "stable_diffusion", "device": "default" }, "class_type": "CLIPLoader" },
         "6": { "inputs": { "vae_name": "qwen_image_vae.safetensors" }, "class_type": "VAELoader" },
         "7": { "inputs": { "width": width, "height": height, "batch_size": batchSize }, "class_type": "EmptyLatentImage" },
