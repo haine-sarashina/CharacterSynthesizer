@@ -269,31 +269,24 @@ async function generateAnimaPrompt() {
     document.getElementById('tags-warnings').innerHTML = ""; // Clear warnings
     saveSettings(); // Save immediately so reload doesn't bring them back
     
-    const systemPrompt = `You are an expert prompt engineer for an Anime-style AI image generator called Anima.
-Your task is to translate the user's Japanese description into an English prompt EXACTLY as requested, without hallucinating.
+    const systemPrompt = `You are an expert prompt engineer for an Anime-style AI image generator.
+Your task is to exhaustively translate the user's Japanese description into English, without hallucinating.
+
 CRITICAL RULE 1: ALL outputs MUST be in English ONLY. Do NOT output ANY Japanese or Chinese characters.
-CRITICAL RULE 2: Output ONLY a valid JSON object. Do NOT output ANY "thinking process", "thought process", explanations, or conversational text. Provide ONLY the JSON.
-CRITICAL RULE 3: The "tags" array MUST contain ONLY short Danbooru-style tags (maximum 1-3 words). ABSOLUTELY NO sentences, verbs, or prepositional phrases. 
-CRITICAL RULE 4: DO NOT OMIT ANY DETAILS. You must exhaustively translate EVERY SINGLE concept, clothing item, background element, and action provided by the user into tags. Do NOT summarize or skip anything.
+CRITICAL RULE 2: Output ONLY a valid JSON object. Do NOT output ANY "thinking process" or explanations.
+CRITICAL RULE 3: DO NOT OMIT ANY DETAILS. You must translate EVERY SINGLE concept, clothing item, background element, and action provided by the user. Do not summarize or skip anything.
+
+Guidelines for translation:
+- Convert everything that can be expressed as a short tag into Danbooru-style tags (maximum 1-3 words) and place them in the "tags" array.
+- For complex actions, nuances, or concepts that cannot be easily converted into short tags, translate them into natural language sentences and place them in the "text" array.
+- You do NOT need to sort the tags in any particular order. The system will handle sorting automatically.
+
 BAD TAGS: "a girl with red hair", "she is standing", "looking at the viewer", "in the city"
 GOOD TAGS: "1girl", "red hair", "standing", "looking at viewer", "city"
-Do NOT make up random clothing, weapons, or backgrounds unless implied. 
-
-Rules for the "tags" array (MUST be in this specific order according to Anima guide):
-1. Subject count & Character: (e.g., "1girl", "solo", "original character", "hatsune miku").
-2. Body & Hair & Face & Outfit: (e.g., "pale skin", "long hair", "red hair", "blue eyes", "school uniform").
-3. Pose & Action: (e.g., "standing", "looking at viewer", "holding umbrella").
-4. Camera & Composition: (e.g., "full body", "cowboy shot", "from above").
-5. Background & Scene: (e.g., "city", "night", "rain").
-6. Lighting & Effects: (e.g., "cinematic lighting", "lens flare").
-(Note: Do NOT include meta/quality tags like "masterpiece" or rating tags as they are added separately by the system.)
-
-Rules for the "text" array:
-Provide 1 to 3 English sentences describing the scene, action, and atmosphere faithfully.
 
 You MUST output a valid JSON object with EXACTLY two arrays:
-1. "tags": An array of strings following the order above. MUST BE ENGLISH ONLY and SHORT TAGS ONLY.
-2. "text": An array of strings containing the natural language description. MUST BE ENGLISH ONLY.
+1. "tags": An array of short English strings. 
+2. "text": An array of English strings containing natural language descriptions for anything that couldn't be a short tag.
 
 Do NOT use parentheses or weight modifiers like (1girl:1.2).
 Do NOT include any markdown code blocks (like \`\`\`json). Just the raw JSON object starting with { and ending with }.
@@ -301,7 +294,7 @@ Do NOT include any markdown code blocks (like \`\`\`json). Just the raw JSON obj
 Example JSON output:
 {
   "tags": ["1girl", "solo", "long red hair", "blue eyes", "standing", "looking at viewer", "full body", "city", "night", "cinematic lighting"],
-  "text": ["A young woman with long red hair and blue eyes is standing in the city at night."]
+  "text": ["She is feeling very nostalgic while watching the scenery."]
 }`;
     let elapsedSeconds = 0;
     const timerInterval = setInterval(() => {
