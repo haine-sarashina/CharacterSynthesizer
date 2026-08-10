@@ -269,20 +269,18 @@ async function generateAnimaPrompt() {
     document.getElementById('tags-warnings').innerHTML = ""; // Clear warnings
     saveSettings(); // Save immediately so reload doesn't bring them back
     
-    const systemPrompt = `You are an expert prompt engineer for an Anime-style AI image generator.
-Your task is to exhaustively translate the user's Japanese description into English, without hallucinating.
+    const systemPrompt = `You are an expert translator and prompt engineer for an AI image generator.
+Your PRIMARY GOAL is to translate the user's Japanese description into English with 100% accuracy and ZERO loss of detail.
 
 CRITICAL RULE 1: ALL outputs MUST be in English ONLY. Do NOT output ANY Japanese or Chinese characters.
 CRITICAL RULE 2: Output ONLY a valid JSON object. Do NOT output ANY "thinking process" or explanations.
-CRITICAL RULE 3: DO NOT OMIT ANY DETAILS. You must translate EVERY SINGLE concept, clothing item, background element, and action provided by the user. Do not summarize or skip anything.
+CRITICAL RULE 3: DO NOT OMIT ANY DETAILS. You must translate EVERY SINGLE word, color, adjective, and concept provided by the user. Do not summarize, generalize, or skip anything. (e.g. if the user says "黒のレースのブラジャー", you must output "black lace bra", NOT just "lace bra").
 
 Guidelines for translation:
-- Convert everything that can be expressed as a short tag into Danbooru-style tags (maximum 1-3 words) and place them in the "tags" array.
-- For complex actions, nuances, or concepts that cannot be easily converted into short tags, translate them into natural language sentences and place them in the "text" array.
-- You do NOT need to sort the tags in any particular order. The system will handle sorting automatically.
-
-BAD TAGS: "a girl with red hair", "she is standing", "looking at the viewer", "in the city"
-GOOD TAGS: "1girl", "red hair", "standing", "looking at viewer", "city"
+- First, translate the text EXACTLY. 
+- Try to format the translations as short tags (maximum 1-4 words) and place them in the "tags" array. Danbooru-style tags are preferred, but ONLY if they don't lose any detail. If a standard Danbooru tag loses information, use a literal translated tag instead (e.g. use "black lace bra" instead of standard "lace bra").
+- For complex actions, nuances, or sentences that cannot be made into short tags without losing meaning, place their exact natural language translations in the "text" array.
+- Converting to Danbooru format is a "best effort" secondary goal. Your absolute top priority is preserving every single detail of the original text.
 
 You MUST output a valid JSON object with EXACTLY two arrays:
 1. "tags": An array of short English strings. 
@@ -293,8 +291,8 @@ Do NOT include any markdown code blocks (like \`\`\`json). Just the raw JSON obj
 
 Example JSON output:
 {
-  "tags": ["1girl", "solo", "long red hair", "blue eyes", "standing", "looking at viewer", "full body", "city", "night", "cinematic lighting"],
-  "text": ["She is feeling very nostalgic while watching the scenery."]
+  "tags": ["1girl", "black lace bra", "standing", "city"],
+  "text": ["She is looking at the viewer with a gentle smile."]
 }`;
     let elapsedSeconds = 0;
     const timerInterval = setInterval(() => {
