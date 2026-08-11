@@ -1281,7 +1281,20 @@ function renderCandidates() {
             stockBtn.style.color = "#000";
         };
         
+        const editBtn = document.createElement("button");
+        editBtn.className = "overlay-btn";
+        editBtn.style.background = "linear-gradient(135deg, rgba(255, 120, 0, 0.8), rgba(255, 0, 100, 0.8))";
+        editBtn.style.borderColor = "#ff4444";
+        editBtn.style.color = "#fff";
+        editBtn.innerHTML = "🎨 Send to Edit";
+        editBtn.onclick = () => {
+            if (typeof sendToEditStudio === 'function') {
+                sendToEditStudio(candidate.url);
+            }
+        };
+        
         overlay.appendChild(viewBtn);
+        overlay.appendChild(editBtn);
         overlay.appendChild(stockBtn);
         card.appendChild(img);
         card.appendChild(overlay);
@@ -1804,19 +1817,30 @@ function saveLoraCart() {
 
 function switchStudioTab(tab) {
     const viewGacha = document.getElementById("view-gacha");
+    const viewEdit = document.getElementById("view-edit");
     const viewLora = document.getElementById("view-lora");
     const btnGacha = document.getElementById("tab-btn-gacha");
+    const btnEdit = document.getElementById("tab-btn-edit");
     const btnLora = document.getElementById("tab-btn-lora");
+    
+    // Hide all
+    if (viewGacha) viewGacha.classList.add("hidden");
+    if (viewEdit) viewEdit.classList.add("hidden");
+    if (viewLora) viewLora.classList.add("hidden");
+    
+    // Deactivate all
+    if (btnGacha) btnGacha.classList.remove("active");
+    if (btnEdit) btnEdit.classList.remove("active");
+    if (btnLora) btnLora.classList.remove("active");
     
     if (tab === 'gacha') {
         if (viewGacha) viewGacha.classList.remove("hidden");
-        if (viewLora) viewLora.classList.add("hidden");
         if (btnGacha) btnGacha.classList.add("active");
-        if (btnLora) btnLora.classList.remove("active");
+    } else if (tab === 'edit') {
+        if (viewEdit) viewEdit.classList.remove("hidden");
+        if (btnEdit) btnEdit.classList.add("active");
     } else {
-        if (viewGacha) viewGacha.classList.add("hidden");
         if (viewLora) viewLora.classList.remove("hidden");
-        if (btnGacha) btnGacha.classList.remove("active");
         if (btnLora) btnLora.classList.add("active");
         updateLoraCartUI();
     }
@@ -2136,3 +2160,316 @@ if (resizer && leftPanel) {
         }
     });
 }
+
+// ==========================================
+// IMAGE EDIT STUDIO (Img2Img) LOGIC
+// ==========================================
+
+let editCurrentCandidates = [];
+let uploadedEditImageFilename = null;
+
+// UI Elements for Edit Studio
+const editDropzone = document.getElementById("edit-image-dropzone");
+const editImageInput = document.getElementById("edit-image-input");
+const editImagePreview = document.getElementById("edit-image-preview");
+const editPlaceholder = document.getElementById("edit-image-placeholder");
+
+const editMagicPromptInput = document.getElementById("edit-magic-prompt");
+const editPromptInput = document.getElementById("edit-prompt-input");
+const editNegativeInput = document.getElementById("edit-negative-input");
+const btnEditMagicPrompt = document.getElementById("btn-edit-magic-prompt");
+const editGenerateBtn = document.getElementById("edit-generate-btn");
+
+const editDenoiseInput = document.getElementById("edit-denoise");
+const editDenoiseVal = document.getElementById("edit-denoise-val");
+const editWidthSelect = document.getElementById("edit-image-width");
+const editHeightSelect = document.getElementById("edit-image-height");
+const editBatchSizeInput = document.getElementById("edit-batch-size");
+
+const editCandidatesContainer = document.getElementById("edit-candidates-container");
+const editScrollLeftBtn = document.getElementById("edit-scroll-left-btn");
+const editScrollRightBtn = document.getElementById("edit-scroll-right-btn");
+
+// Denoise slider update
+if (editDenoiseInput && editDenoiseVal) {
+    editDenoiseInput.addEventListener("input", () => {
+        editDenoiseVal.textContent = parseFloat(editDenoiseInput.value).toFixed(2);
+    });
+}
+
+// Upload Image to ComfyUI
+async function uploadImageToComfy(file) {
+    const formData = new FormData();
+    formData.append("image", file);
+    formData.append("overwrite", "true");
+    
+    try {
+        const response = await fetch(`http://${SERVER_URL}/upload/image`, {
+            method: "POST",
+            body: formData
+        });
+        const result = await response.json();
+        return result.name;
+    } catch (e) {
+        console.error("Failed to upload image to ComfyUI:", e);
+        alert("画像のアップロードに失敗しました。ComfyUIサーバーが起動しているか確認してください。");
+        return null;
+    }
+}
+
+// Handle Image Selection
+async function handleEditImageSelection(file) {
+    if (!file) return;
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        editImagePreview.src = e.target.result;
+        editImagePreview.classList.remove("hidden");
+        editPlaceholder.classList.add("hidden");
+        editDropzone.style.borderColor = "rgba(0, 255, 136, 0.5)";
+    };
+    reader.readAsDataURL(file);
+    
+    // Upload to ComfyUI
+    uploadedEditImageFilename = await uploadImageToComfy(file);
+    if (uploadedEditImageFilename) {
+        checkEditReady();
+    }
+}
+
+// Dropzone Events
+if (editDropzone && editImageInput) {
+    editDropzone.addEventListener("click", () => editImageInput.click());
+    editImageInput.addEventListener("change", (e) => handleEditImageSelection(e.target.files[0]));
+    
+    editDropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        editDropzone.style.borderColor = "var(--accent-color)";
+    });
+    editDropzone.addEventListener("dragleave", (e) => {
+        e.preventDefault();
+        editDropzone.style.borderColor = "rgba(255,255,255,0.2)";
+    });
+    editDropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        editDropzone.style.borderColor = "rgba(255,255,255,0.2)";
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleEditImageSelection(e.dataTransfer.files[0]);
+        }
+    });
+}
+
+// Check if ready to generate
+function checkEditReady() {
+    if (uploadedEditImageFilename && editPromptInput.value.trim() !== "") {
+        editGenerateBtn.disabled = false;
+    } else {
+        editGenerateBtn.disabled = true;
+    }
+}
+if (editPromptInput) editPromptInput.addEventListener("input", checkEditReady);
+
+// Send from Gacha to Edit Studio
+window.sendToEditStudio = async function(imageUrl) {
+    switchStudioTab('edit');
+    try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], "gacha_import.png", { type: "image/png" });
+        await handleEditImageSelection(file);
+    } catch (e) {
+        console.error("Failed to load image from Gacha:", e);
+        alert("画像のインポートに失敗しました。");
+    }
+};
+
+// Edit Magic Prompt
+window.generateEditPrompt = async function() {
+    const rawText = editMagicPromptInput.value.trim();
+    if (!rawText) return;
+    
+    const ollamaModel = ollamaModelSelect ? ollamaModelSelect.value : "gemma2";
+    btnEditMagicPrompt.disabled = true;
+    btnEditMagicPrompt.innerHTML = '<span class="icon">⏳</span> 翻訳中...';
+    
+    const systemPrompt = `You are an expert translator and prompt engineer for an AI image generator.
+Your PRIMARY GOAL is to translate the user's Japanese description into English with 100% accuracy and ZERO loss of detail.
+CRITICAL RULE 1: ALL outputs MUST be in English ONLY.
+CRITICAL RULE 2: Output ONLY a valid JSON object. Do NOT output ANY "thinking process".
+CRITICAL RULE 3: DO NOT OMIT ANY DETAILS.
+
+Guidelines:
+- First, translate the text EXACTLY.
+- Format the translations as short tags (maximum 1-4 words) in the "tags" array. Danbooru-style is preferred ONLY if no detail is lost.
+- Place any complex sentences in the "text" array.
+- Output JSON format: { "tags": ["tag1", "tag2"], "text": ["sentence here"] }`;
+
+    try {
+        const response = await fetch("http://127.0.0.1:11434/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: ollamaModel,
+                prompt: rawText,
+                system: systemPrompt,
+                stream: false,
+                format: "json",
+                options: { temperature: 0.2 }
+            })
+        });
+        
+        const data = await response.json();
+        const parsed = JSON.parse(data.response);
+        
+        let finalTags = [];
+        if (parsed.tags && parsed.tags.length > 0) finalTags = finalTags.concat(parsed.tags);
+        if (parsed.text && parsed.text.length > 0) finalTags = finalTags.concat(parsed.text);
+        
+        editPromptInput.value = finalTags.join(", ");
+        editNegativeInput.value = negativeInput ? negativeInput.value : "worst quality, low quality, bad anatomy, watermark, text";
+        
+        checkEditReady();
+    } catch (e) {
+        console.error("Ollama generate failed:", e);
+        alert("プロンプトの生成に失敗しました。Ollamaが起動しているか確認してください。");
+    } finally {
+        btnEditMagicPrompt.disabled = false;
+        btnEditMagicPrompt.innerHTML = '<span class="icon">🪄</span> Generate Edit Prompt';
+    }
+};
+
+// Render Edit Candidates
+function renderEditCandidates() {
+    editCandidatesContainer.innerHTML = "";
+    if (editCurrentCandidates.length === 0) {
+        editCandidatesContainer.innerHTML = '<div class="candidate-placeholder">No edit results yet.</div>';
+        return;
+    }
+    
+    editCurrentCandidates.forEach((candidate) => {
+        const card = document.createElement("div");
+        card.className = "candidate-card";
+        
+        const img = document.createElement("img");
+        img.src = candidate.url;
+        
+        const overlay = document.createElement("div");
+        overlay.className = "card-overlay";
+        
+        const viewBtn = document.createElement("button");
+        viewBtn.className = "overlay-btn";
+        viewBtn.innerHTML = "&#128269; Enlarge";
+        viewBtn.onclick = () => openModal(candidate.url);
+        
+        const stockBtn = document.createElement("button");
+        stockBtn.className = "overlay-btn";
+        stockBtn.style.background = "linear-gradient(135deg, rgba(121, 40, 202, 0.8), rgba(0, 195, 255, 0.8))";
+        stockBtn.style.borderColor = "#00c3ff";
+        stockBtn.style.color = "#fff";
+        stockBtn.innerHTML = "⭐ Stock for LoRA";
+        stockBtn.onclick = () => {
+            addToLoraCart(candidate);
+            stockBtn.innerHTML = "✅ Stocked!";
+            stockBtn.style.background = "#00ff88";
+            stockBtn.style.color = "#000";
+        };
+        
+        overlay.appendChild(viewBtn);
+        overlay.appendChild(stockBtn);
+        card.appendChild(img);
+        card.appendChild(overlay);
+        editCandidatesContainer.appendChild(card);
+    });
+}
+
+// Generate Edit (Img2Img Workflow)
+if (editGenerateBtn) {
+    editGenerateBtn.addEventListener("click", async () => {
+        if (!uploadedEditImageFilename) return;
+        
+        editGenerateBtn.disabled = true;
+        const progressContainer = document.getElementById("edit-progress-container");
+        if (progressContainer) progressContainer.classList.remove("hidden");
+        
+        editCurrentCandidates = [];
+        renderEditCandidates();
+        
+        const prompt = editPromptInput.value;
+        const negative = editNegativeInput.value;
+        const batchSize = parseInt(editBatchSizeInput.value);
+        const steps = stepsInput ? parseInt(stepsInput.value) : 25;
+        const cfg = cfgInput ? parseFloat(cfgInput.value) : 7.0;
+        const denoise = parseFloat(editDenoiseInput.value);
+        const seed = Math.floor(Math.random() * 1000000);
+        const width = parseInt(editWidthSelect.value);
+        const height = parseInt(editHeightSelect.value);
+        
+        const today = new Date();
+        const dateStr = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0') + "-" + String(today.getDate()).padStart(2, '0');
+        
+        const workflow = {
+            "3": {
+                "inputs": {
+                    "seed": seed, "steps": steps, "cfg": cfg,
+                    "sampler_name": "euler", "scheduler": "normal", "denoise": denoise,
+                    "model": ["4", 0], "positive": ["8", 0], "negative": ["9", 0], "latent_image": ["15", 0]
+                },
+                "class_type": "KSampler"
+            },
+            "4": { "inputs": { "unet_name": modelSelect.value, "weight_dtype": "default" }, "class_type": "UNETLoader" },
+            "5": { "inputs": { "clip_name": clipSelect.value !== "default" ? clipSelect.value : "qwen_3_06b_base.safetensors", "type": "stable_diffusion", "device": "default" }, "class_type": "CLIPLoader" },
+            "6": { "inputs": { "vae_name": "qwen_image_vae.safetensors" }, "class_type": "VAELoader" },
+            "8": { "inputs": { "text": prompt, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
+            "9": { "inputs": { "text": negative, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
+            "10": { "inputs": { "samples": ["3", 0], "vae": ["6", 0] }, "class_type": "VAEDecode" },
+            "11": { "inputs": { "filename_prefix": \`Anima_Edit_\${dateStr}\`, "images": ["10", 0] }, "class_type": "SaveImage" },
+            
+            // Img2Img specific nodes
+            "12": { "inputs": { "pixels": ["13", 0], "vae": ["6", 0] }, "class_type": "VAEEncode" },
+            "13": { "inputs": { "image": ["14", 0], "upscale_method": "bicubic", "width": width, "height": height, "crop": "center" }, "class_type": "ImageScale" },
+            "14": { "inputs": { "image": uploadedEditImageFilename }, "class_type": "LoadImage" },
+            "15": { "inputs": { "amount": batchSize, "samples": ["12", 0] }, "class_type": "RepeatLatentBatch" }
+        };
+        
+        try {
+            const response = await fetch(\`http://\${SERVER_URL}/prompt\`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: workflow, client_id: CLIENT_ID })
+            });
+            const result = await response.json();
+            
+            const promptId = result.prompt_id;
+            while (true) {
+                const histRes = await fetch(\`http://\${SERVER_URL}/history/\${promptId}\`);
+                const history = await histRes.json();
+                if (promptId in history) {
+                    const outputs = history[promptId].outputs;
+                    let images = null;
+                    for (const key in outputs) {
+                        if (outputs[key] && outputs[key].images) {
+                            images = outputs[key].images;
+                            break;
+                        }
+                    }
+                    if (images) {
+                        editCurrentCandidates = images.map(img => ({
+                            url: \`http://\${SERVER_URL}/view?filename=\${img.filename}&subfolder=\${img.subfolder}&type=\${img.type}\`,
+                            filename: img.filename
+                        }));
+                        renderEditCandidates();
+                    }
+                    break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        } catch (e) {
+            console.error("Edit generation failed:", e);
+            alert("画像生成に失敗しました。ComfyUIサーバーが起動しているか確認してください。");
+        } finally {
+            editGenerateBtn.disabled = false;
+            if (progressContainer) progressContainer.classList.add("hidden");
+        }
+    });
+}
+

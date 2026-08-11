@@ -1037,3 +1037,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
     flex-direction: column;
     gap: 6px;
 }
+
+.image-dropzone:hover {
+    border-color: rgba(0, 240, 255, 0.8) !important;
+    background: rgba(0, 240, 255, 0.05);
+}
+
