@@ -2423,7 +2423,7 @@ if (editGenerateBtn) {
             "8": { "inputs": { "text": prompt, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
             "9": { "inputs": { "text": negative, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
             "10": { "inputs": { "samples": ["3", 0], "vae": ["6", 0] }, "class_type": "VAEDecode" },
-            "11": { "inputs": { "filename_prefix": \`Anima_Edit_\${dateStr}\`, "images": ["10", 0] }, "class_type": "SaveImage" },
+            "11": { "inputs": { "filename_prefix": `Anima_Edit_${dateStr}`, "images": ["10", 0] }, "class_type": "SaveImage" },
             
             // Img2Img specific nodes
             "12": { "inputs": { "pixels": ["13", 0], "vae": ["6", 0] }, "class_type": "VAEEncode" },
@@ -2433,7 +2433,7 @@ if (editGenerateBtn) {
         };
         
         try {
-            const response = await fetch(\`http://\${SERVER_URL}/prompt\`, {
+            const response = await fetch(`http://${SERVER_URL}/prompt`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ prompt: workflow, client_id: CLIENT_ID })
             });
@@ -2441,7 +2441,7 @@ if (editGenerateBtn) {
             
             const promptId = result.prompt_id;
             while (true) {
-                const histRes = await fetch(\`http://\${SERVER_URL}/history/\${promptId}\`);
+                const histRes = await fetch(`http://${SERVER_URL}/history/${promptId}`);
                 const history = await histRes.json();
                 if (promptId in history) {
                     const outputs = history[promptId].outputs;
@@ -2454,7 +2454,7 @@ if (editGenerateBtn) {
                     }
                     if (images) {
                         editCurrentCandidates = images.map(img => ({
-                            url: \`http://\${SERVER_URL}/view?filename=\${img.filename}&subfolder=\${img.subfolder}&type=\${img.type}\`,
+                            url: `http://${SERVER_URL}/view?filename=${img.filename}&subfolder=${img.subfolder}&type=${img.type}`,
                             filename: img.filename
                         }));
                         renderEditCandidates();
