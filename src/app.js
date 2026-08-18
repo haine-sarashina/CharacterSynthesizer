@@ -1242,6 +1242,9 @@ async function pollGachaStatus(promptId) {
                     filename: img.filename
                 }));
                 renderCandidates();
+                if (typeof saveToHistory === 'function') {
+                    currentCandidates.forEach(c => saveToHistory(c.url, 'gacha'));
+                }
             }
             hideProgressBar();
             setUIBusy(false);
@@ -1818,19 +1821,23 @@ function saveLoraCart() {
 function switchStudioTab(tab) {
     const viewGacha = document.getElementById("view-gacha");
     const viewEdit = document.getElementById("view-edit");
+    const viewHistory = document.getElementById("view-history");
     const viewLora = document.getElementById("view-lora");
     const btnGacha = document.getElementById("tab-btn-gacha");
     const btnEdit = document.getElementById("tab-btn-edit");
+    const btnHistory = document.getElementById("tab-btn-history");
     const btnLora = document.getElementById("tab-btn-lora");
     
     // Hide all
     if (viewGacha) viewGacha.classList.add("hidden");
     if (viewEdit) viewEdit.classList.add("hidden");
+    if (viewHistory) viewHistory.classList.add("hidden");
     if (viewLora) viewLora.classList.add("hidden");
     
     // Deactivate all
     if (btnGacha) btnGacha.classList.remove("active");
     if (btnEdit) btnEdit.classList.remove("active");
+    if (btnHistory) btnHistory.classList.remove("active");
     if (btnLora) btnLora.classList.remove("active");
     
     if (tab === 'gacha') {
@@ -1839,6 +1846,10 @@ function switchStudioTab(tab) {
     } else if (tab === 'edit') {
         if (viewEdit) viewEdit.classList.remove("hidden");
         if (btnEdit) btnEdit.classList.add("active");
+    } else if (tab === 'history') {
+        if (viewHistory) viewHistory.classList.remove("hidden");
+        if (btnHistory) btnHistory.classList.add("active");
+        if (typeof loadHistory === 'function') loadHistory();
     } else {
         if (viewLora) viewLora.classList.remove("hidden");
         if (btnLora) btnLora.classList.add("active");
@@ -2458,6 +2469,9 @@ if (editGenerateBtn) {
                             filename: img.filename
                         }));
                         renderEditCandidates();
+                        if (typeof saveToHistory === 'function') {
+                            editCurrentCandidates.forEach(c => saveToHistory(c.url, 'edit'));
+                        }
                     }
                     break;
                 }
