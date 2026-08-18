@@ -2514,7 +2514,7 @@ const historyBtnEdit = document.getElementById("history-btn-edit");
 window.saveToHistory = async function(candidateUrl, source = "gacha") {
     // Collect metadata from current UI state based on source
     let metadata = {};
-    const timestamp = Date.now().toString();
+    const timestamp = Date.now().toString() + "_" + Math.floor(Math.random() * 10000);
     
     if (source === "gacha") {
         metadata = {
@@ -2524,28 +2524,28 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
             englishText: document.getElementById("generated-text") ? document.getElementById("generated-text").value : "",
             finalPrompt: promptInput ? promptInput.value.trim() : "",
             negativePrompt: negativeInput ? negativeInput.value.trim() : "",
-            width: parseInt(widthSelect ? widthSelect.value : "1024"),
-            height: parseInt(heightSelect ? heightSelect.value : "1024"),
+            width: parseInt(typeof imageWidthSelect !== 'undefined' && imageWidthSelect ? imageWidthSelect.value : "1024"),
+            height: parseInt(typeof imageHeightSelect !== 'undefined' && imageHeightSelect ? imageHeightSelect.value : "1024"),
             seed: parseInt(document.getElementById("fixed-seed") && document.getElementById("fixed-seed").value ? document.getElementById("fixed-seed").value : "0"), // we don't have exact seed easily without parsing comfy history deeply, but we can store UI seed
-            steps: parseInt(stepsInput ? stepsInput.value : "25"),
-            cfg: parseFloat(cfgInput ? cfgInput.value : "7.0"),
+            steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
+            cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
             denoise: 1.0,
             createdAt: new Date().toLocaleString()
         };
     } else if (source === "edit") {
         metadata = {
             id: timestamp,
-            originalPrompt: editMagicPromptInput ? editMagicPromptInput.value.trim() : "",
+            originalPrompt: typeof editMagicPromptInput !== 'undefined' && editMagicPromptInput ? editMagicPromptInput.value.trim() : "",
             tags: "", // Edit uses prompt directly
             englishText: "",
-            finalPrompt: editPromptInput ? editPromptInput.value.trim() : "",
-            negativePrompt: editNegativeInput ? editNegativeInput.value.trim() : "",
-            width: parseInt(editWidthSelect ? editWidthSelect.value : "768"),
-            height: parseInt(editHeightSelect ? editHeightSelect.value : "768"),
+            finalPrompt: typeof editPromptInput !== 'undefined' && editPromptInput ? editPromptInput.value.trim() : "",
+            negativePrompt: typeof editNegativeInput !== 'undefined' && editNegativeInput ? editNegativeInput.value.trim() : "",
+            width: parseInt(typeof editWidthSelect !== 'undefined' && editWidthSelect ? editWidthSelect.value : "768"),
+            height: parseInt(typeof editHeightSelect !== 'undefined' && editHeightSelect ? editHeightSelect.value : "768"),
             seed: 0,
-            steps: parseInt(stepsInput ? stepsInput.value : "25"),
-            cfg: parseFloat(cfgInput ? cfgInput.value : "7.0"),
-            denoise: parseFloat(editDenoiseInput ? editDenoiseInput.value : "0.6"),
+            steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
+            cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
+            denoise: parseFloat(typeof editDenoiseInput !== 'undefined' && editDenoiseInput ? editDenoiseInput.value : "0.6"),
             createdAt: new Date().toLocaleString()
         };
     }
