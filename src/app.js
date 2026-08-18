@@ -2530,6 +2530,7 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
             steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
             cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
             denoise: 1.0,
+            model: document.getElementById("model-select") ? document.getElementById("model-select").value : "",
             createdAt: new Date().toLocaleString()
         };
     } else if (source === "edit") {
@@ -2546,6 +2547,7 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
             steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
             cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
             denoise: parseFloat(typeof editDenoiseInput !== 'undefined' && editDenoiseInput ? editDenoiseInput.value : "0.6"),
+            model: document.getElementById("model-select") ? document.getElementById("model-select").value : "",
             createdAt: new Date().toLocaleString()
         };
     }
@@ -2634,7 +2636,15 @@ function selectHistoryItem(item, imgUrl) {
     
     historyDetailImg.src = imgUrl;
     historyDetailDate.textContent = `生成日時: ${m.createdAt || '不明'}`;
+    
+    const modelField = document.getElementById("history-detail-model");
+    if (modelField) modelField.value = m.model || "Unknown";
+    
     historyDetailPrompt.value = m.finalPrompt || "";
+    
+    const negativeField = document.getElementById("history-detail-negative");
+    if (negativeField) negativeField.value = m.negativePrompt || "";
+    
     historyDetailOriginal.value = m.originalPrompt || m.tags || "";
     
     historyDetailSeed.textContent = m.seed || "-";

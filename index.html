@@ -475,48 +475,61 @@
             </main>
 
             <!-- 履歴・アセット View -->
-            <main id="view-history" class="main-content hidden" style="flex-direction: column;">
-                <div class="panel" style="margin: 16px; display: flex; gap: 16px; align-items: center; padding: 12px 16px;">
-                    <label style="color: var(--accent-color); font-weight: bold;">🔎 履歴検索</label>
-                    <input type="text" id="history-search-input" placeholder="プロンプトやタグのキーワードを入力..." style="flex: 1; padding: 10px; font-size: 1.1em; border-radius: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: #fff;">
-                    <button id="history-reload-btn" class="btn secondary-btn" onclick="loadHistory()">🔄 更新</button>
+            <main id="view-history" class="main-content hidden" style="flex-direction: row; height: 100%; overflow: hidden;">
+                <!-- 左側：検索パネル -->
+                <div class="panel" style="width: 280px; margin: 16px; padding: 16px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; overflow-y: auto;">
+                    <h2 style="color: var(--accent-color); font-size: 1.2em; margin-bottom: 8px;">🔎 履歴検索</h2>
+                    <div class="form-group">
+                        <label style="color: var(--text-muted);">キーワード検索</label>
+                        <input type="text" id="history-search-input" placeholder="プロンプトやタグ..." style="width: 100%; padding: 10px; font-size: 1em; border-radius: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: #fff;">
+                    </div>
+                    <div style="flex: 1;"></div> <!-- Spacer -->
+                    <button id="history-reload-btn" class="btn secondary-btn" onclick="loadHistory()">🔄 最新を読み込み</button>
                 </div>
                 
-                <div class="panel viewport-area" style="flex: 1; margin: 0 16px 16px 16px; min-height: 0; display: flex;">
-                    <!-- 左側：ギャラリー -->
-                    <div id="history-gallery" style="flex: 2; overflow-y: auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; align-content: start;">
+                <!-- 中央：ギャラリー -->
+                <div class="panel viewport-area" style="flex: 1; margin: 16px 0; min-width: 300px; display: flex; flex-direction: column; overflow: hidden;">
+                    <div id="history-gallery" style="flex: 1; overflow-y: auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; align-content: start;">
                         <!-- サムネイルがここに動的に追加される -->
                     </div>
-                    
-                    <!-- 右側：詳細表示 -->
-                    <div id="history-detail-panel" style="flex: 1; min-width: 300px; max-width: 450px; background: rgba(0,0,0,0.3); border-left: 1px solid var(--border-color); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
-                        <div id="history-detail-placeholder" style="color: var(--text-muted); text-align: center; margin-top: 50px;">
-                            画像を選択してください
+                </div>
+                
+                <!-- 右側：詳細表示 -->
+                <div id="history-detail-panel" class="panel" style="width: 380px; margin: 16px; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+                    <div id="history-detail-placeholder" style="color: var(--text-muted); text-align: center; margin-top: 50px;">
+                        画像を選択してください
+                    </div>
+                    <div id="history-detail-content" class="hidden" style="display: flex; flex-direction: column; gap: 12px;">
+                        <img id="history-detail-img" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer;" onclick="openModal(this.src)">
+                        <div style="font-size: 0.9em; color: var(--text-muted);" id="history-detail-date"></div>
+                        
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Model</label>
+                            <input type="text" id="history-detail-model" readonly style="width: 100%; padding: 6px; background: rgba(0,0,0,0.5); font-size: 0.85em; border: 1px solid var(--border-color); color: #fff;">
                         </div>
-                        <div id="history-detail-content" class="hidden" style="display: flex; flex-direction: column; gap: 16px;">
-                            <img id="history-detail-img" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer;" onclick="openModal(this.src)">
-                            <div style="font-size: 0.9em; color: var(--text-muted);" id="history-detail-date"></div>
-                            
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label>生成プロンプト</label>
-                                <textarea id="history-detail-prompt" readonly style="width: 100%; height: 80px; resize: vertical; background: rgba(0,0,0,0.5); font-size: 0.85em;"></textarea>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label>元の日本語指示 / タグ</label>
-                                <textarea id="history-detail-original" readonly style="width: 100%; height: 60px; resize: vertical; background: rgba(0,0,0,0.5); font-size: 0.85em;"></textarea>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85em;">
-                                <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>Seed:</strong> <span id="history-detail-seed"></span></div>
-                                <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>Size:</strong> <span id="history-detail-size"></span></div>
-                                <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>Steps:</strong> <span id="history-detail-steps"></span></div>
-                                <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>CFG / Denoise:</strong> <span id="history-detail-cfg"></span></div>
-                            </div>
-                            
-                            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                                <button class="btn primary-btn" id="history-btn-gacha" style="flex: 1; padding: 10px;">✨ ガチャへ復元</button>
-                                <button class="btn secondary-btn" id="history-btn-edit" style="flex: 1; padding: 10px;">🎨 編集スタジオへ</button>
-                            </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>生成プロンプト</label>
+                            <textarea id="history-detail-prompt" readonly style="width: 100%; height: 60px; resize: vertical; background: rgba(0,0,0,0.5); font-size: 0.85em;"></textarea>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>ネガティブプロンプト</label>
+                            <textarea id="history-detail-negative" readonly style="width: 100%; height: 50px; resize: vertical; background: rgba(0,0,0,0.5); font-size: 0.85em;"></textarea>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>元の日本語指示 / タグ</label>
+                            <textarea id="history-detail-original" readonly style="width: 100%; height: 50px; resize: vertical; background: rgba(0,0,0,0.5); font-size: 0.85em;"></textarea>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85em;">
+                            <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>Seed:</strong> <span id="history-detail-seed"></span></div>
+                            <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>Size:</strong> <span id="history-detail-size"></span></div>
+                            <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>Steps:</strong> <span id="history-detail-steps"></span></div>
+                            <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;"><strong>CFG/Denoise:</strong> <span id="history-detail-cfg"></span></div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button class="btn primary-btn" id="history-btn-gacha" style="flex: 1; padding: 10px; font-size: 0.9em;">✨ ガチャへ復元</button>
+                            <button class="btn secondary-btn" id="history-btn-edit" style="flex: 1; padding: 10px; font-size: 0.9em;">🎨 編集へ送信</button>
                         </div>
                     </div>
                 </div>
