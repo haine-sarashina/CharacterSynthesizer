@@ -2473,3 +2473,195 @@ if (editGenerateBtn) {
     });
 }
 
+// ==========================================
+// HISTORY / ASSET STORAGE LOGIC
+// ==========================================
+
+let historyItems = [];
+let filteredHistoryItems = [];
+let selectedHistoryItem = null;
+
+const historyGallery = document.getElementById("history-gallery");
+const historySearchInput = document.getElementById("history-search-input");
+const historyDetailPlaceholder = document.getElementById("history-detail-placeholder");
+const historyDetailContent = document.getElementById("history-detail-content");
+const historyDetailImg = document.getElementById("history-detail-img");
+const historyDetailDate = document.getElementById("history-detail-date");
+const historyDetailPrompt = document.getElementById("history-detail-prompt");
+const historyDetailOriginal = document.getElementById("history-detail-original");
+const historyDetailSeed = document.getElementById("history-detail-seed");
+const historyDetailSize = document.getElementById("history-detail-size");
+const historyDetailSteps = document.getElementById("history-detail-steps");
+const historyDetailCfg = document.getElementById("history-detail-cfg");
+const historyBtnGacha = document.getElementById("history-btn-gacha");
+const historyBtnEdit = document.getElementById("history-btn-edit");
+
+// Called automatically to save a generated candidate
+window.saveToHistory = async function(candidateUrl, source = "gacha") {
+    // Collect metadata from current UI state based on source
+    let metadata = {};
+    const timestamp = Date.now().toString();
+    
+    if (source === "gacha") {
+        metadata = {
+            id: timestamp,
+            originalPrompt: magicPromptInput ? magicPromptInput.value.trim() : "",
+            tags: document.getElementById("generated-tags") ? document.getElementById("generated-tags").value : "",
+            englishText: document.getElementById("generated-text") ? document.getElementById("generated-text").value : "",
+            finalPrompt: promptInput ? promptInput.value.trim() : "",
+            negativePrompt: negativeInput ? negativeInput.value.trim() : "",
+            width: parseInt(widthSelect ? widthSelect.value : "1024"),
+            height: parseInt(heightSelect ? heightSelect.value : "1024"),
+            seed: parseInt(document.getElementById("fixed-seed") && document.getElementById("fixed-seed").value ? document.getElementById("fixed-seed").value : "0"), // we don't have exact seed easily without parsing comfy history deeply, but we can store UI seed
+            steps: parseInt(stepsInput ? stepsInput.value : "25"),
+            cfg: parseFloat(cfgInput ? cfgInput.value : "7.0"),
+            denoise: 1.0,
+            createdAt: new Date().toLocaleString()
+        };
+    } else if (source === "edit") {
+        metadata = {
+            id: timestamp,
+            originalPrompt: editMagicPromptInput ? editMagicPromptInput.value.trim() : "",
+            tags: "", // Edit uses prompt directly
+            englishText: "",
+            finalPrompt: editPromptInput ? editPromptInput.value.trim() : "",
+            negativePrompt: editNegativeInput ? editNegativeInput.value.trim() : "",
+            width: parseInt(editWidthSelect ? editWidthSelect.value : "768"),
+            height: parseInt(editHeightSelect ? editHeightSelect.value : "768"),
+            seed: 0,
+            steps: parseInt(stepsInput ? stepsInput.value : "25"),
+            cfg: parseFloat(cfgInput ? cfgInput.value : "7.0"),
+            denoise: parseFloat(editDenoiseInput ? editDenoiseInput.value : "0.6"),
+            createdAt: new Date().toLocaleString()
+        };
+    }
+
+    try {
+        await invoke('save_history', { imageUrl: candidateUrl, metadata: metadata });
+        console.log(`Saved history item ${timestamp}`);
+    } catch (e) {
+        console.error("Failed to save history:", e);
+    }
+};
+
+window.loadHistory = async function() {
+    try {
+        const items = await invoke('get_history');
+        historyItems = items;
+        filterHistory();
+    } catch (e) {
+        console.error("Failed to load history:", e);
+    }
+};
+
+if (historySearchInput) {
+    historySearchInput.addEventListener("input", filterHistory);
+}
+
+function filterHistory() {
+    const query = historySearchInput.value.toLowerCase().trim();
+    if (!query) {
+        filteredHistoryItems = historyItems;
+    } else {
+        filteredHistoryItems = historyItems.filter(item => {
+            const m = item.metadata;
+            const searchTarget = `${m.originalPrompt} ${m.tags} ${m.englishText} ${m.finalPrompt}`.toLowerCase();
+            return searchTarget.includes(query);
+        });
+    }
+    renderHistoryGallery();
+}
+
+function renderHistoryGallery() {
+    if (!historyGallery) return;
+    historyGallery.innerHTML = "";
+    
+    if (filteredHistoryItems.length === 0) {
+        historyGallery.innerHTML = '<div style="color: var(--text-muted);">履歴が見つかりません。</div>';
+        return;
+    }
+    
+    filteredHistoryItems.forEach(item => {
+        const card = document.createElement("div");
+        card.style.position = "relative";
+        card.style.aspectRatio = "1 / 1";
+        card.style.borderRadius = "8px";
+        card.style.overflow = "hidden";
+        card.style.cursor = "pointer";
+        card.style.boxShadow = "0 2px 8px rgba(0,0,0,0.5)";
+        card.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
+        card.className = "history-card";
+        
+        // Hover effects in JS (can also be in CSS)
+        card.onmouseenter = () => { card.style.transform = "scale(1.02)"; card.style.boxShadow = "0 4px 12px rgba(0,240,255,0.4)"; };
+        card.onmouseleave = () => { card.style.transform = "scale(1)"; card.style.boxShadow = "0 2px 8px rgba(0,0,0,0.5)"; };
+        
+        const imgUrl = tauri.core.convertFileSrc(item.imagePath);
+        
+        const img = document.createElement("img");
+        img.src = imgUrl;
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "cover";
+        
+        card.onclick = () => selectHistoryItem(item, imgUrl);
+        
+        card.appendChild(img);
+        historyGallery.appendChild(card);
+    });
+}
+
+function selectHistoryItem(item, imgUrl) {
+    selectedHistoryItem = item;
+    const m = item.metadata;
+    
+    historyDetailPlaceholder.classList.add("hidden");
+    historyDetailContent.classList.remove("hidden");
+    
+    historyDetailImg.src = imgUrl;
+    historyDetailDate.textContent = `生成日時: ${m.createdAt || '不明'}`;
+    historyDetailPrompt.value = m.finalPrompt || "";
+    historyDetailOriginal.value = m.originalPrompt || m.tags || "";
+    
+    historyDetailSeed.textContent = m.seed || "-";
+    historyDetailSize.textContent = `${m.width} x ${m.height}`;
+    historyDetailSteps.textContent = m.steps || "-";
+    historyDetailCfg.textContent = `${m.cfg || "-"} / ${m.denoise || "-"}`;
+}
+
+if (historyBtnGacha) {
+    historyBtnGacha.addEventListener("click", () => {
+        if (!selectedHistoryItem) return;
+        const m = selectedHistoryItem.metadata;
+        
+        // Restore to Gacha UI
+        if (magicPromptInput) magicPromptInput.value = m.originalPrompt || "";
+        if (promptInput) promptInput.value = m.finalPrompt || "";
+        if (negativeInput) negativeInput.value = m.negativePrompt || "";
+        if (widthSelect) widthSelect.value = m.width || "1024";
+        if (heightSelect) heightSelect.value = m.height || "1024";
+        if (document.getElementById("fixed-seed") && m.seed) document.getElementById("fixed-seed").value = m.seed;
+        
+        switchStudioTab('gacha');
+    });
+}
+
+if (historyBtnEdit) {
+    historyBtnEdit.addEventListener("click", async () => {
+        if (!selectedHistoryItem) return;
+        
+        // Convert local path to File object for edit dropzone
+        const imgUrl = tauri.core.convertFileSrc(selectedHistoryItem.imagePath);
+        if (typeof sendToEditStudio === 'function') {
+            await sendToEditStudio(imgUrl);
+        }
+        
+        const m = selectedHistoryItem.metadata;
+        if (editMagicPromptInput) editMagicPromptInput.value = m.originalPrompt || "";
+        if (editPromptInput) editPromptInput.value = m.finalPrompt || "";
+    });
+}
+
+// Ensure tauri core is available for convertFileSrc
+const tauri = window.__TAURI__;
+

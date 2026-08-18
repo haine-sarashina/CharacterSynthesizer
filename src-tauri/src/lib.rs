@@ -3,6 +3,89 @@ use std::io::Read;
 use base64::Engine;
 use tauri::{Manager, Emitter};
 
+// --- History Storage Additions ---
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryMetadata {
+    pub id: String,
+    pub original_prompt: String,
+    pub tags: String,
+    pub english_text: String,
+    pub final_prompt: String,
+    pub negative_prompt: String,
+    pub width: u32,
+    pub height: u32,
+    pub seed: i64,
+    pub steps: u32,
+    pub cfg: f32,
+    pub denoise: f32,
+    pub created_at: String,
+}
+
+#[tauri::command]
+fn save_history(app: tauri::AppHandle, image_url: String, metadata: HistoryMetadata) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("history");
+    fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+
+    let timestamp = metadata.id.clone();
+    let img_path = data_dir.join(format!("{}.png", timestamp));
+    let json_path = data_dir.join(format!("{}.json", timestamp));
+
+    if let Ok(response) = ureq::get(&image_url).call() {
+        let mut bytes = Vec::new();
+        if response.into_reader().read_to_end(&mut bytes).is_ok() {
+            fs::write(&img_path, &bytes).map_err(|e| e.to_string())?;
+            let json_str = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
+            fs::write(&json_path, json_str).map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+    }
+    Err("Failed to download or save image".to_string())
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryItem {
+    pub metadata: serde_json::Value,
+    pub image_path: String,
+}
+
+#[tauri::command]
+fn get_history(app: tauri::AppHandle) -> Result<Vec<HistoryItem>, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("history");
+    if !data_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut items = Vec::new();
+    if let Ok(entries) = fs::read_dir(&data_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(&content) {
+                        let id = metadata["id"].as_str().unwrap_or("").to_string();
+                        let img_path = data_dir.join(format!("{}.png", id));
+                        items.push(HistoryItem {
+                            metadata,
+                            image_path: img_path.to_string_lossy().to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    items.sort_by(|a, b| {
+        let id_a = a.metadata["id"].as_str().unwrap_or("");
+        let id_b = b.metadata["id"].as_str().unwrap_or("");
+        id_b.cmp(id_a)
+    });
+
+    Ok(items)
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetItem {
@@ -407,7 +490,9 @@ pub fn run() {
             export_lora_dataset,
             start_lora_training,
             ollama_models,
-            ollama_generate
+            ollama_generate,
+            save_history,
+            get_history
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
