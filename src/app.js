@@ -1,6 +1,7 @@
 // ComfyUI Server Configuration & Tauri IPC Storage Adapter
 import { invoke } from '@tauri-apps/api/core';
-
+import { getVersion } from '@tauri-apps/api/app';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 async function diskSave(key, data) {
     try {
         await invoke('save_app_data', { key: key, content: JSON.stringify(data) });
@@ -2781,3 +2782,23 @@ if (historyBtnEdit) {
 // Ensure tauri core is available for convertFileSrc
 const tauri = window.__TAURI__;
 
+// Dynamically set app version from Tauri
+async function initializeAppVersion() {
+    try {
+        const version = await getVersion();
+        const badge = document.getElementById("app-version-badge");
+        if (badge) {
+            badge.textContent = `v${version}`;
+        }
+        
+        try {
+            const currentWindow = getCurrentWindow();
+            await currentWindow.setTitle(`Character Synthesizer (v${version} Desktop Edition)`);
+        } catch (e) {
+            console.error("Failed to set window title:", e);
+        }
+    } catch (e) {
+        console.error("Failed to get app version:", e);
+    }
+}
+initializeAppVersion();
