@@ -2331,7 +2331,29 @@ Guidelines:
         });
         
         const data = await response.json();
-        const parsed = JSON.parse(data.response);
+        
+        let rawStr = data.response.replace(/```json/gi, "").replace(/```/g, "").trim();
+        let jsonStr = rawStr;
+        const firstBrace = rawStr.indexOf('{');
+        if (firstBrace !== -1) {
+            let depth = 0, lastBrace = -1;
+            for (let i = firstBrace; i < rawStr.length; i++) {
+                if (rawStr[i] === '{') depth++;
+                else if (rawStr[i] === '}') {
+                    depth--;
+                    if (depth === 0) { lastBrace = i; break; }
+                }
+            }
+            if (lastBrace !== -1) jsonStr = rawStr.substring(firstBrace, lastBrace + 1);
+        }
+        
+        let parsed;
+        try {
+            parsed = JSON.parse(jsonStr);
+        } catch (err) {
+            console.error("Failed to parse Ollama JSON:", err, data.response);
+            throw new Error("Invalid JSON from Ollama");
+        }
         
         let finalTags = [];
         if (parsed.tags && parsed.tags.length > 0) finalTags = finalTags.concat(parsed.tags);
@@ -2343,7 +2365,11 @@ Guidelines:
         checkEditReady();
     } catch (e) {
         console.error("Ollama generate failed:", e);
-        alert("プロンプトの生成に失敗しました。Ollamaが起動しているか確認してください。");
+        if (e.message === "Invalid JSON from Ollama") {
+            alert("翻訳モデルが不正な形式で応答しました。もう一度試すか、入力文章を少し変更してください。");
+        } else {
+            alert("プロンプトの生成に失敗しました。Ollamaが起動しているか確認してください。");
+        }
     } finally {
         btnEditMagicPrompt.disabled = false;
         btnEditMagicPrompt.innerHTML = '<span class="icon">🪄</span> Generate Edit Prompt';
