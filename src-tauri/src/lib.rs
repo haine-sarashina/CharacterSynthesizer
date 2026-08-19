@@ -3,32 +3,13 @@ use std::io::Read;
 use base64::Engine;
 use tauri::{Manager, Emitter};
 
-// --- History Storage Additions ---
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HistoryMetadata {
-    pub id: String,
-    pub original_prompt: String,
-    pub tags: String,
-    pub english_text: String,
-    pub final_prompt: String,
-    pub negative_prompt: String,
-    pub width: u32,
-    pub height: u32,
-    pub seed: i64,
-    pub steps: u32,
-    pub cfg: f32,
-    pub denoise: f32,
-    pub created_at: String,
-}
 
 #[tauri::command]
-fn save_history(app: tauri::AppHandle, image_url: String, metadata: HistoryMetadata) -> Result<(), String> {
+fn save_history(app: tauri::AppHandle, image_url: String, metadata: serde_json::Value) -> Result<(), String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("history");
     fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
-    let timestamp = metadata.id.clone();
+    let timestamp = metadata["id"].as_str().unwrap_or("unknown_id").to_string();
     let img_path = data_dir.join(format!("{}.png", timestamp));
     let json_path = data_dir.join(format!("{}.json", timestamp));
 

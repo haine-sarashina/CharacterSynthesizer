@@ -2516,21 +2516,33 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
     let metadata = {};
     const timestamp = Date.now().toString() + "_" + Math.floor(Math.random() * 10000);
     
+    // Collect advanced settings
+    const advancedSettings = {
+        model: document.getElementById("model-select") ? document.getElementById("model-select").value : "",
+        vae: document.getElementById("vae-select") ? document.getElementById("vae-select").value : "",
+        clip: document.getElementById("clip-select") ? document.getElementById("clip-select").value : "",
+        sampler: document.getElementById("sampler-name") ? document.getElementById("sampler-name").value : "",
+        scheduler: document.getElementById("scheduler") ? document.getElementById("scheduler").value : "",
+        clipSkip: document.getElementById("clip-skip") ? document.getElementById("clip-skip").value : "",
+        metaTags: document.getElementById("meta-tags-input") ? document.getElementById("meta-tags-input").value : "",
+        rating: document.getElementById("rating-select") ? document.getElementById("rating-select").value : "",
+        ollamaModel: document.getElementById("ollama-model") ? document.getElementById("ollama-model").value : ""
+    };
+    
     if (source === "gacha") {
         metadata = {
             id: timestamp,
-            originalPrompt: magicPromptInput ? magicPromptInput.value.trim() : "",
+            originalPrompt: typeof magicPromptInput !== 'undefined' && magicPromptInput ? magicPromptInput.value.trim() : "",
             tags: document.getElementById("generated-tags") ? document.getElementById("generated-tags").value : "",
             englishText: document.getElementById("generated-text") ? document.getElementById("generated-text").value : "",
-            finalPrompt: promptInput ? promptInput.value.trim() : "",
-            negativePrompt: negativeInput ? negativeInput.value.trim() : "",
+            negativePrompt: typeof negativeInput !== 'undefined' && negativeInput ? negativeInput.value.trim() : "",
             width: parseInt(typeof imageWidthSelect !== 'undefined' && imageWidthSelect ? imageWidthSelect.value : "1024"),
             height: parseInt(typeof imageHeightSelect !== 'undefined' && imageHeightSelect ? imageHeightSelect.value : "1024"),
             seed: parseInt(document.getElementById("fixed-seed") && document.getElementById("fixed-seed").value ? document.getElementById("fixed-seed").value : "0"), // we don't have exact seed easily without parsing comfy history deeply, but we can store UI seed
             steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
             cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
             denoise: 1.0,
-            model: document.getElementById("model-select") ? document.getElementById("model-select").value : "",
+            advancedSettings: advancedSettings,
             createdAt: new Date().toLocaleString()
         };
     } else if (source === "edit") {
@@ -2539,7 +2551,6 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
             originalPrompt: typeof editMagicPromptInput !== 'undefined' && editMagicPromptInput ? editMagicPromptInput.value.trim() : "",
             tags: "", // Edit uses prompt directly
             englishText: "",
-            finalPrompt: typeof editPromptInput !== 'undefined' && editPromptInput ? editPromptInput.value.trim() : "",
             negativePrompt: typeof editNegativeInput !== 'undefined' && editNegativeInput ? editNegativeInput.value.trim() : "",
             width: parseInt(typeof editWidthSelect !== 'undefined' && editWidthSelect ? editWidthSelect.value : "768"),
             height: parseInt(typeof editHeightSelect !== 'undefined' && editHeightSelect ? editHeightSelect.value : "768"),
@@ -2547,7 +2558,7 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
             steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
             cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
             denoise: parseFloat(typeof editDenoiseInput !== 'undefined' && editDenoiseInput ? editDenoiseInput.value : "0.6"),
-            model: document.getElementById("model-select") ? document.getElementById("model-select").value : "",
+            advancedSettings: advancedSettings,
             createdAt: new Date().toLocaleString()
         };
     }
@@ -2581,7 +2592,7 @@ function filterHistory() {
     } else {
         filteredHistoryItems = historyItems.filter(item => {
             const m = item.metadata;
-            const searchTarget = `${m.originalPrompt} ${m.tags} ${m.englishText} ${m.finalPrompt}`.toLowerCase();
+            const searchTarget = `${m.originalPrompt || ''} ${m.tags || ''} ${m.englishText || ''}`.toLowerCase();
             return searchTarget.includes(query);
         });
     }
@@ -2637,21 +2648,52 @@ function selectHistoryItem(item, imgUrl) {
     historyDetailImg.src = imgUrl;
     historyDetailDate.textContent = `生成日時: ${m.createdAt || '不明'}`;
     
-    const modelField = document.getElementById("history-detail-model");
-    if (modelField) modelField.value = m.model || "Unknown";
-    
-    historyDetailPrompt.value = m.finalPrompt || "";
-    
-    const negativeField = document.getElementById("history-detail-negative");
-    if (negativeField) negativeField.value = m.negativePrompt || "";
-    
-    historyDetailOriginal.value = m.originalPrompt || m.tags || "";
-    
     historyDetailSeed.textContent = m.seed || "-";
     historyDetailSize.textContent = `${m.width} x ${m.height}`;
     historyDetailSteps.textContent = m.steps || "-";
     historyDetailCfg.textContent = `${m.cfg || "-"} / ${m.denoise || "-"}`;
 }
+
+const historyBtnShowText = document.getElementById("history-btn-show-text");
+if (historyBtnShowText) {
+    historyBtnShowText.addEventListener("click", () => {
+        if (!selectedHistoryItem) return;
+        const m = selectedHistoryItem.metadata;
+        const text = `【元の日本語指示】\n${m.originalPrompt || "なし"}\n\n` +
+                     `【生成されたタグ】\n${m.tags || "なし"}\n\n` +
+                     `【生成された英文】\n${m.englishText || "なし"}\n\n` +
+                     `【ネガティブプロンプト】\n${m.negativePrompt || "なし"}`;
+        
+        document.getElementById("history-info-title").textContent = "指示・テキスト等";
+        document.getElementById("history-info-content").textContent = text;
+        document.getElementById("history-info-modal").classList.remove("hidden");
+    });
+}
+
+const historyBtnShowSettings = document.getElementById("history-btn-show-settings");
+if (historyBtnShowSettings) {
+    historyBtnShowSettings.addEventListener("click", () => {
+        if (!selectedHistoryItem) return;
+        const adv = selectedHistoryItem.metadata.advancedSettings || {};
+        const text = `Model: ${adv.model || "不明"}\n` +
+                     `VAE: ${adv.vae || "不明"}\n` +
+                     `Text Encoder: ${adv.clip || "不明"}\n` +
+                     `Sampler: ${adv.sampler || "不明"}\n` +
+                     `Scheduler: ${adv.scheduler || "不明"}\n` +
+                     `CLIP Skip: ${adv.clipSkip || "不明"}\n` +
+                     `Rating: ${adv.rating || "不明"}\n` +
+                     `Ollama Model: ${adv.ollamaModel || "不明"}\n\n` +
+                     `【Meta Tags】\n${adv.metaTags || "なし"}`;
+        
+        document.getElementById("history-info-title").textContent = "設定パラメータ";
+        document.getElementById("history-info-content").textContent = text;
+        document.getElementById("history-info-modal").classList.remove("hidden");
+    });
+}
+
+document.getElementById("history-info-close")?.addEventListener("click", () => {
+    document.getElementById("history-info-modal").classList.add("hidden");
+});
 
 if (historyBtnGacha) {
     historyBtnGacha.addEventListener("click", () => {
@@ -2660,11 +2702,30 @@ if (historyBtnGacha) {
         
         // Restore to Gacha UI
         if (magicPromptInput) magicPromptInput.value = m.originalPrompt || "";
-        if (promptInput) promptInput.value = m.finalPrompt || "";
+        const tagsElem = document.getElementById("generated-tags");
+        if (tagsElem && m.tags) tagsElem.value = m.tags;
+        const engElem = document.getElementById("generated-text");
+        if (engElem && m.englishText) engElem.value = m.englishText;
+        
         if (negativeInput) negativeInput.value = m.negativePrompt || "";
-        if (widthSelect) widthSelect.value = m.width || "1024";
-        if (heightSelect) heightSelect.value = m.height || "1024";
+        
+        if (typeof imageWidthSelect !== 'undefined' && imageWidthSelect) imageWidthSelect.value = m.width || "1024";
+        if (typeof imageHeightSelect !== 'undefined' && imageHeightSelect) imageHeightSelect.value = m.height || "1024";
         if (document.getElementById("fixed-seed") && m.seed) document.getElementById("fixed-seed").value = m.seed;
+        
+        if (typeof stepsInput !== 'undefined' && stepsInput) stepsInput.value = m.steps || "25";
+        if (typeof cfgInput !== 'undefined' && cfgInput) cfgInput.value = m.cfg || "7.0";
+
+        const adv = m.advancedSettings || {};
+        if (adv.model && document.getElementById("model-select")) document.getElementById("model-select").value = adv.model;
+        if (adv.vae && document.getElementById("vae-select")) document.getElementById("vae-select").value = adv.vae;
+        if (adv.clip && document.getElementById("clip-select")) document.getElementById("clip-select").value = adv.clip;
+        if (adv.sampler && document.getElementById("sampler-name")) document.getElementById("sampler-name").value = adv.sampler;
+        if (adv.scheduler && document.getElementById("scheduler")) document.getElementById("scheduler").value = adv.scheduler;
+        if (adv.clipSkip && document.getElementById("clip-skip")) document.getElementById("clip-skip").value = adv.clipSkip;
+        if (adv.rating && document.getElementById("rating-select")) document.getElementById("rating-select").value = adv.rating;
+        if (adv.metaTags && document.getElementById("meta-tags-input")) document.getElementById("meta-tags-input").value = adv.metaTags;
+        if (adv.ollamaModel && document.getElementById("ollama-model")) document.getElementById("ollama-model").value = adv.ollamaModel;
         
         switchStudioTab('gacha');
     });
@@ -2674,15 +2735,14 @@ if (historyBtnEdit) {
     historyBtnEdit.addEventListener("click", async () => {
         if (!selectedHistoryItem) return;
         
-        // Convert local path to File object for edit dropzone
         const imgUrl = tauri.core.convertFileSrc(selectedHistoryItem.imagePath);
         if (typeof sendToEditStudio === 'function') {
             await sendToEditStudio(imgUrl);
         }
         
         const m = selectedHistoryItem.metadata;
-        if (editMagicPromptInput) editMagicPromptInput.value = m.originalPrompt || "";
-        if (editPromptInput) editPromptInput.value = m.finalPrompt || "";
+        // Do NOT restore positive/magic prompts for Edit studio per user request
+        if (typeof editNegativeInput !== 'undefined' && editNegativeInput) editNegativeInput.value = m.negativePrompt || "";
     });
 }
 
