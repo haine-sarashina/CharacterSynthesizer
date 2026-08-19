@@ -2533,8 +2533,8 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
         metadata = {
             id: timestamp,
             originalPrompt: typeof magicPromptInput !== 'undefined' && magicPromptInput ? magicPromptInput.value.trim() : "",
-            tags: document.getElementById("generated-tags") ? document.getElementById("generated-tags").value : "",
-            englishText: document.getElementById("generated-text") ? document.getElementById("generated-text").value : "",
+            tags: typeof getTagsFromUI === 'function' ? getTagsFromUI().join(", ") : "",
+            englishText: typeof textConfirmArea !== 'undefined' && textConfirmArea ? textConfirmArea.value : "",
             negativePrompt: typeof negativeInput !== 'undefined' && negativeInput ? negativeInput.value.trim() : "",
             width: parseInt(typeof imageWidthSelect !== 'undefined' && imageWidthSelect ? imageWidthSelect.value : "1024"),
             height: parseInt(typeof imageHeightSelect !== 'undefined' && imageHeightSelect ? imageHeightSelect.value : "1024"),
@@ -2702,10 +2702,16 @@ if (historyBtnGacha) {
         
         // Restore to Gacha UI
         if (magicPromptInput) magicPromptInput.value = m.originalPrompt || "";
-        const tagsElem = document.getElementById("generated-tags");
-        if (tagsElem && m.tags) tagsElem.value = m.tags;
-        const engElem = document.getElementById("generated-text");
-        if (engElem && m.englishText) engElem.value = m.englishText;
+        
+        if (m.tags && typeof renderTags === 'function') {
+            renderTags(m.tags.split(",").map(t => t.trim()).filter(t => t.length > 0));
+        } else if (typeof renderTags === 'function') {
+            renderTags([]); // Clear tags if none
+        }
+        
+        if (typeof textConfirmArea !== 'undefined' && textConfirmArea) {
+            textConfirmArea.value = m.englishText || "";
+        }
         
         if (negativeInput) negativeInput.value = m.negativePrompt || "";
         
