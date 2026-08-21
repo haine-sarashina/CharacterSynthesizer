@@ -1063,6 +1063,16 @@ let profilerStartTime = 0;
 let profilerCurrentNode = null;
 window.currentWorkflowNodes = window.currentWorkflowNodes || {};
 
+function logToGachaArea(msg) {
+    const logArea = document.getElementById("gacha-log-area");
+    if (logArea) {
+        const div = document.createElement("div");
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logArea.appendChild(div);
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+}
+
 function connectWebSocket() {
     ws = new WebSocket(`ws://${SERVER_URL}/ws?clientId=${CLIENT_ID}`);
     ws.onmessage = (event) => {
@@ -1072,27 +1082,24 @@ function connectWebSocket() {
             updateProgressBar(val, `Processing... (${val}%)`);
         } else if (data.type === "executing") {
             const now = Date.now();
-            const profilerEl = document.getElementById("profiler-log");
             
             // Record time for previous node
             if (profilerCurrentNode !== null && data.data.node !== profilerCurrentNode) {
                 const elapsed = ((now - profilerStartTime) / 1000).toFixed(2);
                 const className = window.currentWorkflowNodes[profilerCurrentNode] || `Node ${profilerCurrentNode}`;
                 console.log(`[Profiler] ${className} took ${elapsed}s`);
-                if (profilerEl) {
-                    profilerEl.textContent = `Completed: ${className} (${elapsed}s)`;
-                }
+                logToGachaArea(`Completed: ${className} (${elapsed}s)`);
             }
             
             if (data.data.node === null) {
                 hideProgressBar();
                 profilerCurrentNode = null;
-                if (profilerEl) {
-                    setTimeout(() => { if (profilerCurrentNode === null) profilerEl.textContent = ""; }, 5000);
-                }
+                logToGachaArea(`Workflow execution finished.`);
             } else {
                 profilerCurrentNode = data.data.node;
                 profilerStartTime = now;
+                const className = window.currentWorkflowNodes[profilerCurrentNode] || `Node ${profilerCurrentNode}`;
+                logToGachaArea(`Executing: ${className}...`);
             }
         }
     };
@@ -1123,6 +1130,10 @@ generateBtn.addEventListener("click", async () => {
     currentCandidates = [];
     renderCandidates();
     document.getElementById('tags-warnings').innerHTML = ""; // Clear warnings
+    
+    const logArea = document.getElementById("gacha-log-area");
+    if (logArea) logArea.innerHTML = "";
+    logToGachaArea("Starting new Gacha Roll...");
     
     const prompt = promptInput.value;
     const negative = negativeInput.value;
@@ -1215,6 +1226,7 @@ generateBtn.addEventListener("click", async () => {
             body: JSON.stringify({ prompt: workflow, client_id: CLIENT_ID })
         });
         const result = await response.json();
+        logToGachaArea(`Queued prompt successfully (ID: ${result.prompt_id})`);
         await pollGachaStatus(result.prompt_id);
     } catch (e) {
         alert("ComfyUI connection failed.");
@@ -1238,6 +1250,7 @@ async function pollGachaStatus(promptId) {
             }
             
             if (images) {
+                logToGachaArea(`Generated ${images.length} candidate(s).`);
                 currentCandidates = images.map(img => ({
                     url: `http://${SERVER_URL}/view?filename=${img.filename}&subfolder=${img.subfolder}&type=${img.type}`,
                     filename: img.filename
