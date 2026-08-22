@@ -1168,7 +1168,7 @@ generateBtn.addEventListener("click", async () => {
         "7": { "inputs": { "width": width, "height": height, "batch_size": batchSize }, "class_type": "EmptyLatentImage" },
         "8": { "inputs": { "text": prompt, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
         "9": { "inputs": { "text": negative, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
-        "10": { "inputs": { "samples": ["3", 0], "vae": ["6", 0] }, "class_type": "VAEDecodeTiled" },
+        "10": { "inputs": { "samples": ["3", 0], "vae": ["6", 0], "tile_size": 512, "overlap": 64, "temporal_size": 64, "temporal_overlap": 8 }, "class_type": "VAEDecodeTiled" },
         "11": { "inputs": { "filename_prefix": `Anima_Gacha_${dateStr}`, "images": ["10", 0] }, "class_type": "SaveImage" }
     };
     
@@ -1363,7 +1363,7 @@ synthesizeBtn.addEventListener("click", async () => {
         "4": { "inputs": { "ckpt_name": modelSelect.value }, "class_type": "CheckpointLoaderSimple" },
         "6": { "inputs": { "text": prompt, "clip": ["4", 1] }, "class_type": "CLIPTextEncode" },
         "7": { "inputs": { "text": negative, "clip": ["4", 1] }, "class_type": "CLIPTextEncode" },
-        "8": { "inputs": { "samples": ["3", 0], "vae": vaeNodeLink }, "class_type": "VAEDecodeTiled" },
+        "8": { "inputs": { "samples": ["3", 0], "vae": vaeNodeLink, "tile_size": 512, "overlap": 64, "temporal_size": 64, "temporal_overlap": 8 }, "class_type": "VAEDecodeTiled" },
         "9": { "inputs": { "filename_prefix": "Montage", "images": ["8", 0] }, "class_type": "SaveImage" },
         "10": { "inputs": { "image": baseFilename, "upload": "image" }, "class_type": "LoadImage" }, // Base Image
         "11": { "inputs": { "image": partFilename, "upload": "image" }, "class_type": "LoadImage" }, // Part Image
@@ -2473,7 +2473,7 @@ if (editGenerateBtn) {
             "6": { "inputs": { "vae_name": "qwen_image_vae.safetensors" }, "class_type": "VAELoader" },
             "8": { "inputs": { "text": prompt, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
             "9": { "inputs": { "text": negative, "clip": ["5", 0] }, "class_type": "CLIPTextEncode" },
-            "10": { "inputs": { "samples": ["3", 0], "vae": ["6", 0] }, "class_type": "VAEDecodeTiled" },
+            "10": { "inputs": { "samples": ["3", 0], "vae": ["6", 0], "tile_size": 512, "overlap": 64, "temporal_size": 64, "temporal_overlap": 8 }, "class_type": "VAEDecodeTiled" },
             "11": { "inputs": { "filename_prefix": `Anima_Edit_${dateStr}`, "images": ["10", 0] }, "class_type": "SaveImage" },
             
             // Img2Img specific nodes
