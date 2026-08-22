@@ -2566,7 +2566,8 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
         clipSkip: document.getElementById("clip-skip") ? document.getElementById("clip-skip").value : "",
         metaTags: document.getElementById("meta-tags-input") ? document.getElementById("meta-tags-input").value : "",
         rating: document.getElementById("rating-select") ? document.getElementById("rating-select").value : "",
-        ollamaModel: document.getElementById("ollama-model") ? document.getElementById("ollama-model").value : ""
+        ollamaModel: document.getElementById("ollama-model") ? document.getElementById("ollama-model").value : "",
+        ollamaKeepAlive: document.getElementById("ollama-keep-alive") ? document.getElementById("ollama-keep-alive").checked : true
     };
     
     if (source === "gacha") {
@@ -2578,6 +2579,7 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
             negativePrompt: typeof negativeInput !== 'undefined' && negativeInput ? negativeInput.value.trim() : "",
             width: parseInt(typeof imageWidthSelect !== 'undefined' && imageWidthSelect ? imageWidthSelect.value : "1024"),
             height: parseInt(typeof imageHeightSelect !== 'undefined' && imageHeightSelect ? imageHeightSelect.value : "1024"),
+            batchSize: parseInt(document.getElementById("batch-size") ? document.getElementById("batch-size").value : "4"),
             seed: parseInt(document.getElementById("fixed-seed") && document.getElementById("fixed-seed").value ? document.getElementById("fixed-seed").value : "0"), // we don't have exact seed easily without parsing comfy history deeply, but we can store UI seed
             steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
             cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
@@ -2594,6 +2596,7 @@ window.saveToHistory = async function(candidateUrl, source = "gacha") {
             negativePrompt: typeof editNegativeInput !== 'undefined' && editNegativeInput ? editNegativeInput.value.trim() : "",
             width: parseInt(typeof editWidthSelect !== 'undefined' && editWidthSelect ? editWidthSelect.value : "768"),
             height: parseInt(typeof editHeightSelect !== 'undefined' && editHeightSelect ? editHeightSelect.value : "768"),
+            batchSize: parseInt(document.getElementById("edit-batch-size") ? document.getElementById("edit-batch-size").value : "1"),
             seed: 0,
             steps: parseInt(typeof stepsInput !== 'undefined' && stepsInput ? stepsInput.value : "25"),
             cfg: parseFloat(typeof cfgInput !== 'undefined' && cfgInput ? cfgInput.value : "7.0"),
@@ -2714,7 +2717,8 @@ const historyBtnShowSettings = document.getElementById("history-btn-show-setting
 if (historyBtnShowSettings) {
     historyBtnShowSettings.addEventListener("click", () => {
         if (!selectedHistoryItem) return;
-        const adv = selectedHistoryItem.metadata.advancedSettings || {};
+        const m = selectedHistoryItem.metadata;
+        const adv = m.advancedSettings || {};
         const text = `Model: ${adv.model || "不明"}\n` +
                      `VAE: ${adv.vae || "不明"}\n` +
                      `Text Encoder: ${adv.clip || "不明"}\n` +
@@ -2722,7 +2726,9 @@ if (historyBtnShowSettings) {
                      `Scheduler: ${adv.scheduler || "不明"}\n` +
                      `CLIP Skip: ${adv.clipSkip || "不明"}\n` +
                      `Rating: ${adv.rating || "不明"}\n` +
-                     `Ollama Model: ${adv.ollamaModel || "不明"}\n\n` +
+                     `Batch Size: ${m.batchSize || "不明"}\n` +
+                     `Ollama Model: ${adv.ollamaModel || "不明"}\n` +
+                     `Ollama Keep Alive: ${adv.ollamaKeepAlive !== undefined ? (adv.ollamaKeepAlive ? "有効 (ON)" : "無効 (OFF)") : "不明"}\n\n` +
                      `【Meta Tags】\n${adv.metaTags || "なし"}`;
         
         document.getElementById("history-info-title").textContent = "設定パラメータ";
@@ -2757,6 +2763,7 @@ if (historyBtnGacha) {
         
         if (typeof imageWidthSelect !== 'undefined' && imageWidthSelect) imageWidthSelect.value = m.width || "1024";
         if (typeof imageHeightSelect !== 'undefined' && imageHeightSelect) imageHeightSelect.value = m.height || "1024";
+        if (document.getElementById("batch-size") && m.batchSize) document.getElementById("batch-size").value = m.batchSize;
         if (document.getElementById("fixed-seed") && m.seed) document.getElementById("fixed-seed").value = m.seed;
         
         if (typeof stepsInput !== 'undefined' && stepsInput) stepsInput.value = m.steps || "25";
@@ -2772,6 +2779,7 @@ if (historyBtnGacha) {
         if (adv.rating && document.getElementById("rating-select")) document.getElementById("rating-select").value = adv.rating;
         if (adv.metaTags && document.getElementById("meta-tags-input")) document.getElementById("meta-tags-input").value = adv.metaTags;
         if (adv.ollamaModel && document.getElementById("ollama-model")) document.getElementById("ollama-model").value = adv.ollamaModel;
+        if (adv.ollamaKeepAlive !== undefined && document.getElementById("ollama-keep-alive")) document.getElementById("ollama-keep-alive").checked = adv.ollamaKeepAlive;
         
         switchStudioTab('gacha');
     });
