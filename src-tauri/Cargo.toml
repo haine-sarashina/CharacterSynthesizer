@@ -1,6 +1,6 @@
 [package]
 name = "CharacterSynthesizer"
-version = "0.4.9"
+version = "0.4.10"
 description = "Character Synthesizer & LoRA Training Studio Desktop App"
 authors = ["Haine"]
 edition = "2021"
